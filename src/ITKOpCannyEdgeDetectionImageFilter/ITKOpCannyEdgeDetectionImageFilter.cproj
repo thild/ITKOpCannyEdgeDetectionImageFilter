@@ -34,7 +34,6 @@
     <Compile Include="itkOpCannyEdgeDetectionImageFilter.txx" />
     <Compile Include="itkOpCannyEdgeDetectionImageFilter.h" />
     <Compile Include="Timer.cpp" />
-    <Compile Include="bkp.cpp" />
     <Compile Include="itkOpGaussianOperator.txx" />
     <Compile Include="itkOpGaussianOperator.h" />
   </ItemGroup>
@@ -62,7 +61,6 @@
   </ProjectExtensions>
   <ItemGroup>
     <None Include="Timer.h" />
-    <None Include="bkp.txt" />
     <None Include="main.cpp" />
   </ItemGroup>
 </Project>
