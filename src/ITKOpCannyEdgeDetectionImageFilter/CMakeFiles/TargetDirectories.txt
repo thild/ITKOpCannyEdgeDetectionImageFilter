@@ -1,0 +1,2 @@
+/home/tony/dev/mestrado/ITKOpCannyEdgeDetectionImageFilter/src/ITKOpCannyEdgeDetectionImageFilter/CMakeFiles/ITKOpCannyEdgeDetectionImageFilter.dir
+/home/tony/dev/mestrado/ITKOpCannyEdgeDetectionImageFilter/src/ITKOpCannyEdgeDetectionImageFilter/CMakeFiles/opcanny.dir
