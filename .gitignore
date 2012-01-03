@@ -1,5 +1,6 @@
 ITKOpCannyEdgeDetectionImageFilter.user
 ITKOpCannyEdgeDetectionImageFilter.usertasks
+ITKOpCannyEdgeDetectionImageFilter.userprefs
 src/ITKOpCannyEdgeDetectionImageFilter/ITKOpCannyEdgeDetectionImageFilter.pidb
 bin/**/*
 src/ITKOpCannyEdgeDetectionImageFilter/CMakeFiles/**/*
