@@ -30,13 +30,18 @@
 #include "itkObjectStore.h"
 #include "itkCannyEdgeDetectionImageFilter.h"
 #include "itkOpGaussianOperator.h"
-#include "Timer.h"
+
+#include "itkStopWatch.h"
+
 
 
 #include <omp.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
 #include <xmmintrin.h>
+
+#include <iostream>
+#include <iomanip>
 
 //#define DEBUG
 #ifndef DEBUG
@@ -142,6 +147,8 @@
 
 #define ALIGMENT_BYTES 64
 
+using namespace std;
+
 using std::cout;
 using std::cerr;  
 using std::endl;
@@ -149,7 +156,6 @@ using std::setw;
 using std::string;
 using std::ifstream;
 
-using namespace std;
 
 namespace itk
 {
@@ -171,22 +177,30 @@ class HysteresisQueue
 public:
   int Begin;
   int End;
+  int MaxSize;
+  int Count;
 //  unsigned long Count;
   HysteresisEdgeIndex* Buffer;
   
   HysteresisQueue() {  }
   
-  HysteresisQueue(HysteresisEdgeIndex* buffer) {
+  HysteresisQueue(HysteresisEdgeIndex* buffer, int maxSize) {
+   this->MaxSize = maxSize;
    this->Begin = -1;
    this->End = -1;
    this->Buffer = buffer;
+   this->Count = 0;
   }
   
   HysteresisEdgeIndex* Enqueue(int x, int y) {
-   if(IsEmpty()) this->Begin++;
-   //this->End++;
-//   Count++;
-   return &(Buffer[++this->End] = HysteresisEdgeIndex(x,y));
+    if (this->IsFull()) return NULL;
+    if (this->IsEmpty()) this->Begin++;
+    ++this->End;
+    if (this->End == this->MaxSize) {
+      this->End = 0;
+    }
+    ++this->Count;
+    return &(Buffer[this->End] = HysteresisEdgeIndex(x,y));
   }
   
 //  void Enqueue(HysteresisEdgeIndex index) {
@@ -196,41 +210,125 @@ public:
 //  }
   
   HysteresisEdgeIndex* Dequeue() {
-    if(IsEmpty()) return NULL;
+    if(this->IsEmpty()) return NULL;
     int begin = this->Begin;
-    if(this->Begin == this->End) {
-      this->Begin = -1;
-      this->End = -1;
-    } 
-    else {
-      this->Begin++;
+    ++this->Begin;
+    --this->Count;
+    if(this->IsEmpty()) {
+     this->Begin = -1;
+     this->End = -1;
     }
-//    Count--;
+    else {
+      if (this->Begin == this->MaxSize) {
+        this->Begin = 0;
+      }
+    }
     return &Buffer[begin];
   }
   
-  __m128i* DequeueVec() {
-    if(IsEmpty() || this->Count() <= 4) return NULL;
-    this->Begin += 4;
-//    Count--;
-    return (__m128i*)&Buffer[this->Begin - 4];
-  }
+//  __m128i* DequeueVec() {
+//    if(this->IsEmpty() || this->Count <= 4) return NULL;
+//    this->Begin += 4;
+//    this->Count -= 4;
+//    return (__m128i*)&Buffer[this->Begin - 4];
+//  }
   
   
   HysteresisEdgeIndex* Pick() {
    return &Buffer[this->Begin];
   }
   
-  int Count() {
-    return this->End - this->Begin + 1;
+  inline int GetCount() {
+    return this->Count;
   }
   
-  bool IsEmpty() {
-   return this->Begin == -1;
+  inline bool IsEmpty() {
+   return this->Count == 0;
+  }
+  
+  inline bool IsFull() {
+   return this->Count == this->MaxSize;
   }
   
 };
- 
+// 
+//   
+//class HysteresisEdgeIndex
+//{
+//public:
+//  unsigned short X;
+//  unsigned short Y;
+//  HysteresisEdgeIndex(int x, int y) {
+//   this->X = x;
+//   this->Y = y;
+//  }
+//};
+// 
+//class HysteresisQueue
+//{
+//public:
+//  int Begin;
+//  int End;
+////  unsigned long Count;
+//  HysteresisEdgeIndex* Buffer;
+//  
+//  HysteresisQueue() {  }
+//  
+//  HysteresisQueue(HysteresisEdgeIndex* buffer) {
+//   this->Begin = -1;
+//   this->End = -1;
+//   this->Buffer = buffer;
+//  }
+//  
+//  HysteresisEdgeIndex* Enqueue(int x, int y) {
+//   if(IsEmpty()) this->Begin++;
+//   //this->End++;
+////   Count++;
+//   return &(Buffer[++this->End] = HysteresisEdgeIndex(x,y));
+//  }
+//  
+////  void Enqueue(HysteresisEdgeIndex index) {
+////   if(IsEmpty()) this->Begin++;
+////   this->End++;
+////   Buffer[this->End] = HysteresisEdgeIndex(x,y);
+////  }
+//  
+//  HysteresisEdgeIndex* Dequeue() {
+//    if(IsEmpty()) return NULL;
+//    int begin = this->Begin;
+//    if(this->Begin == this->End) {
+//      this->Begin = -1;
+//      this->End = -1;
+//    } 
+//    else {
+//      this->Begin++;
+//    }
+////    Count--;
+//    return &Buffer[begin];
+//  }
+//  
+//  __m128i* DequeueVec() {
+//    if(IsEmpty() || this->Count() <= 4) return NULL;
+//    this->Begin += 4;
+////    Count--;
+//    return (__m128i*)&Buffer[this->Begin - 4];
+//  }
+//  
+//  
+//  HysteresisEdgeIndex* Pick() {
+//   return &Buffer[this->Begin];
+//  }
+//  
+//  int Count() {
+//    return this->End - this->Begin + 1;
+//  }
+//  
+//  bool IsEmpty() {
+//   return this->Begin == -1;
+//  }
+//  
+//};
+//    
    
 /** \class OpCannyEdgeDetectionImageFilter
  *
@@ -392,9 +490,9 @@ public:
     return this->m_Sigma; 
     }
     
-  double GetElapsedTime()
+  StopWatch& GetStopWatch()
     {
-    return this->m_Timer.elapsed();    
+    return this->m_Timer;    
     }  
 
   ///* Set the Threshold value for detected edges. */
@@ -1625,7 +1723,7 @@ void sc3SSE (const int imageStride, const int imageWidth, const int imageHeight,
 //    
   /** Timer*/  
 
-  timer m_Timer;  
+  StopWatch m_Timer;  
 
   /** The variance of the Gaussian Filter used in this filter */
   ArrayType m_Variance;

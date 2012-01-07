@@ -62,9 +62,10 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <list>
 #include <math.h>
 #include <omp.h>
-#include "Timer.h"
+#include "itkStopWatch.h"
 #include <sys/time.h>
 #include <sys/resource.h>
 
@@ -77,11 +78,6 @@ using std::ifstream;
 
 using namespace std;
  
-struct timerStruct 
-{
-    double dCpuTime;
-    CPerfCounter counter;
-} timers; 
 
 int main (int argc, char *argv[])
 {
@@ -103,7 +99,7 @@ if( argc < 3 )
   float lowerThreshold = 4.0;
   float opUpperThreshold = 7.0;
   float opLowerThreshold = 4.0;
-  int iterations = 1; 
+  int iterations = 10; 
 
   if( argc > 4 )
     {
@@ -239,9 +235,7 @@ if( argc < 3 )
         //struct rusage usage; 
         //getrusage(RUSAGE_SELF, &usage);  
         //cout << endl << "Initial total memory usage = " << usage.ru_maxrss << endl;
-        CPerfCounter counter;   
         cout << endl << "ITK OpCanny - " << iterations << " iteration(s)" << endl;
-        counter.Start();
         
         for(int i = 0; i < iterations; i++) {
         
@@ -264,10 +258,18 @@ if( argc < 3 )
             writer->SetFileName(opOutputFilename);
             writer->SetInput( rescale->GetOutput() );    
             writer->Update();          
-           
-            cout << "Iteration " << i + 1 << " of 10 elapsed: " << opCannyFilter->GetElapsedTime() << endl;
-            opElapsed += opCannyFilter->GetElapsedTime();         
+
+            StopWatch st = opCannyFilter->GetStopWatch();
+            vector<MeasuringStep> ms = st.GetMeasuringSteps();
+            for ( vector<MeasuringStep>::iterator it = ms.begin(); it != ms.end(); it++ ) { 
+                  cout << std::setprecision(4) << std::setiosflags(std::ios::fixed) << left << setw(40)
+                    << it->Step << ": " << it->Instant << " : " << it->Elapsed << endl;
+            }
+            cout << "Iteration " << i + 1 << " of 10 elapsed: " << st.GetElapsedTime() << endl;
+            opElapsed += st.GetElapsedTime();         
         }     
+        
+//        
 //        
 //        //getrusage(RUSAGE_SELF, &usage);  
 //        //cout << endl << "Final total memory usage = " << usage.ru_maxrss << endl;
@@ -307,9 +309,14 @@ if( argc < 3 )
             writer->SetInput( rescale->GetOutput() );
             writer->Update();
 
-            cout << "Iteration " << i + 1 << " of 10 elapsed: " << cannyFilter->GetElapsedTime() << endl;
-            elapsed += cannyFilter->GetElapsedTime();  
-            
+            StopWatch st = cannyFilter->GetStopWatch();
+            vector<MeasuringStep> ms = st.GetMeasuringSteps();
+            for ( vector<MeasuringStep>::iterator it = ms.begin(); it != ms.end(); it++ ) { 
+                  cout << std::setprecision(4) << std::setiosflags(std::ios::fixed) << left << setw(40)
+                    << it->Step << ": " << it->Instant << " : " << it->Elapsed << endl;
+            }
+            cout << "Iteration " << i + 1 << " of 10 elapsed: " << st.GetElapsedTime() << endl;
+            elapsed += st.GetElapsedTime();         
         }
         
 //        counter.Stop();

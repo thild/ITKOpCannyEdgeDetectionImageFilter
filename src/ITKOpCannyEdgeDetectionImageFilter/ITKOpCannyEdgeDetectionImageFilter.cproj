@@ -19,7 +19,7 @@
     <SourceDirectory>.</SourceDirectory>
     <OutputName>opcanny</OutputName>
     <CompileTarget>Bin</CompileTarget>
-    <Commandlineparameters>test_64x64.png out.png outop.png</Commandlineparameters>
+    <Commandlineparameters>test_64x64.png out.png op.png</Commandlineparameters>
     <Externalconsole>true</Externalconsole>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -33,9 +33,11 @@
   <ItemGroup>
     <Compile Include="itkOpCannyEdgeDetectionImageFilter.txx" />
     <Compile Include="itkOpCannyEdgeDetectionImageFilter.h" />
-    <Compile Include="Timer.cpp" />
     <Compile Include="itkOpGaussianOperator.txx" />
     <Compile Include="itkOpGaussianOperator.h" />
+    <Compile Include="..\..\..\opConvolution\src\opConvolutionFilter.cpp">
+      <Link>opConvolutionFilter.cpp</Link>
+    </Compile>
   </ItemGroup>
   <ProjectExtensions>
     <MonoDevelop>
@@ -60,7 +62,9 @@
     </MonoDevelop>
   </ProjectExtensions>
   <ItemGroup>
-    <None Include="Timer.h" />
     <None Include="main.cpp" />
+    <None Include="..\..\..\opConvolution\src\opConvolutionFilter.h">
+      <Link>opConvolutionFilter.h</Link>
+    </None>
   </ItemGroup>
 </Project>

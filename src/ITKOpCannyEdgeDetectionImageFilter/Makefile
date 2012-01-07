@@ -124,30 +124,6 @@ opcanny/fast:
 	$(MAKE) -f CMakeFiles/opcanny.dir/build.make CMakeFiles/opcanny.dir/build
 .PHONY : opcanny/fast
 
-Timer.o: Timer.cpp.o
-.PHONY : Timer.o
-
-# target to build an object file
-Timer.cpp.o:
-	$(MAKE) -f CMakeFiles/opcanny.dir/build.make CMakeFiles/opcanny.dir/Timer.cpp.o
-.PHONY : Timer.cpp.o
-
-Timer.i: Timer.cpp.i
-.PHONY : Timer.i
-
-# target to preprocess a source file
-Timer.cpp.i:
-	$(MAKE) -f CMakeFiles/opcanny.dir/build.make CMakeFiles/opcanny.dir/Timer.cpp.i
-.PHONY : Timer.cpp.i
-
-Timer.s: Timer.cpp.s
-.PHONY : Timer.s
-
-# target to generate assembly for a file
-Timer.cpp.s:
-	$(MAKE) -f CMakeFiles/opcanny.dir/build.make CMakeFiles/opcanny.dir/Timer.cpp.s
-.PHONY : Timer.cpp.s
-
 main.o: main.cpp.o
 .PHONY : main.o
 
@@ -182,9 +158,6 @@ help:
 	@echo "... edit_cache"
 	@echo "... opcanny"
 	@echo "... rebuild_cache"
-	@echo "... Timer.o"
-	@echo "... Timer.i"
-	@echo "... Timer.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

@@ -35,8 +35,8 @@ SET(LIBRARY_OUTPUT_PATH
   "../../bin/${CMAKE_BUILD_TYPE}"
 )
 
-
-ADD_EXECUTABLE(opcanny ${PROJECT_SOURCE_DIR}/main.cpp ${PROJECT_SOURCE_DIR}/Timer.cpp ${PROJECT_SOURCE_DIR}/Timer.h)
+#${PROJECT_SOURCE_DIR}/StopWatch.cpp ${PROJECT_SOURCE_DIR}/StopWatch.h)
+ADD_EXECUTABLE(opcanny ${PROJECT_SOURCE_DIR}/main.cpp) 
 ADD_LIBRARY(ITKOpCannyEdgeDetectionImageFilter SHARED ${PROJECT_SOURCE_DIR}/itkOpCannyEdgeDetectionImageFilter.txx 
                                                       ${PROJECT_SOURCE_DIR}/itkOpCannyEdgeDetectionImageFilter.h 
                                                       ${PROJECT_SOURCE_DIR}/itkOpGaussianOperator.txx 

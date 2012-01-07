@@ -23,7 +23,8 @@
 #include "itkNumericTraits.h"
 #include "itkProgressReporter.h"
 #include "itkGradientMagnitudeImageFilter.h"
-#include "Timer.h"
+
+#include "itkStopWatch.h"
 
 #include <omp.h>
 #include <smmintrin.h>
@@ -166,8 +167,10 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 //                   this->GetOutput(0)->GetBufferPointer() );
   //printImage(nWidth, nHeight, nWidth, input->GetBufferPointer());    
   
-  m_Timer.start();  
+  m_Timer.Start();  
+  m_Timer.Checkpoint("Begin GaussianBlur");  
     this->GaussianBlur ( input->GetBufferPointer(), m_GaussianBuffer->GetBufferPointer() );
+  m_Timer.Checkpoint("End GaussianBlur");  
     
 //  cout << "Gaussian OpCanny" << endl;
 //  gaussianKernel1D();
@@ -177,32 +180,42 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   // The output of this filter will be used to store the directional
   // derivative.
 //  cout << "Compute2ndDerivative OpCanny" << endl;
+  m_Timer.Checkpoint("Begin Compute2ndDerivative");  
   this->Compute2ndDerivative();    
+  m_Timer.Checkpoint("End Compute2ndDerivative");  
 //  printImage(nWidth, nHeight, stride, this->GetOutput()->GetBufferPointer());     
   
 //  cout << "Compute2ndDerivativePos OpCanny" << endl;
+  m_Timer.Checkpoint("Begin Compute2ndDerivativePos");  
   this->Compute2ndDerivativePos();    
+  m_Timer.Checkpoint("End Compute2ndDerivativePos");  
 //  printImage(nWidth, nHeight, stride, m_UpdateBuffer->GetBufferPointer());     
 //  printImage(nWidth, nHeight, nWidth, m_UpdateBuffer->GetBufferPointer());    
 
 
 //  cout << "ZeroCrossing OpCanny" << endl;
+  m_Timer.Checkpoint("Begin ZeroCrossing");  
   this->ZeroCrossing();    
+  m_Timer.Checkpoint("End ZeroCrossing");  
 //  printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());     
 //
 //  cout << "Multiply OpCanny" << endl;
+  m_Timer.Checkpoint("Begin Multiply");  
   this->Multiply(stride, nHeight,  
                  m_UpdateBuffer->GetBufferPointer(), 
                  m_GaussianBuffer->GetBufferPointer(), 
                  m_GaussianBuffer->GetBufferPointer());    
+  m_Timer.Checkpoint("End Multiply");  
                  
   // printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());     
                  
                  
+  m_Timer.Checkpoint("Begin HysteresisThresholding");  
   this->HysteresisThresholding();                    
+  m_Timer.Checkpoint("End HysteresisThresholding");  
   //printImage(nWidth, nHeight, stride, this->GetOutput()->GetBufferPointer());     
                  
-  m_Timer.stop();
+  m_Timer.Stop();
 //  printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());     
 
 }
@@ -257,7 +270,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     int stopY   = imageHeight - 2 * halfKernel;
 
       
-    //#pragma omp parallel for shared (inputImage, outputImage) 
+    #pragma omp parallel for shared (inputImage, outputImage) 
     for (int y = startY; y < stopY; ++y) {
       const register __m128 kdx0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);        
       const register __m128 kdx2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);    
@@ -434,7 +447,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     int stopY   = imageHeight - 2 * halfKernel;
 
       
-    #pragma omp parallel for shared (gaussianInput, outputImage) 
+    #pragma omp parallel for shared (gaussianInput, dxInput, outputImage) 
     for (int y = startY; y < stopY; ++y) {
       const register __m128 kdx0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);              
       const register __m128 kdx2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);          
@@ -588,14 +601,18 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         maskThat = _mm_and_ps(that, sign);
         maskThat = _mm_or_ps(maskThat, one);
         
-        lessThan = _mm_cmpneq_ps(maskThis, maskThat);
-        maskThat = _mm_or_ps(lessThan, out);
+        maskThat = _mm_cmpneq_ps(maskThis, maskThat);
+        maskThat = _mm_or_ps(maskThat, out);
 
         absThat = _mm_and_ps(that, abs);
 //        absThis = _mm_and_ps(thisOne, abs);
               
         lessThan = _mm_cmplt_ps(absThis, absThat);
         
+        equal = _mm_cmpeq_ps(absThis, absThat);
+        
+        lessThan = _mm_or_ps(lessThan, equal);
+                
         maskThat = _mm_and_ps(lessThan, maskThat);
         
         out = _mm_or_ps(maskThat, out);
@@ -613,14 +630,12 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         maskThat = _mm_and_ps(that, sign);
         maskThat = _mm_or_ps(maskThat, one);
         
-        lessThan = _mm_cmpneq_ps(maskThis, maskThat);
-        
-        maskThat = _mm_or_ps(lessThan, out);
+        maskThat = _mm_cmpneq_ps(maskThis, maskThat);
+        maskThat = _mm_or_ps(maskThat, out);
 
         absThat = _mm_and_ps(that, abs);
 //        absThis = _mm_and_ps(thisOne, abs);
   
-              
         lessThan = _mm_cmplt_ps(absThis, absThat);
         
         maskThat = _mm_and_ps(lessThan, maskThat);
@@ -638,17 +653,14 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         ROTATE_LEFT(that);
         maskThat = _mm_and_ps(that, sign);
         maskThat = _mm_or_ps(maskThat, one);
-        lessThan = _mm_cmpneq_ps(maskThis, maskThat);
-        maskThat = _mm_or_ps(lessThan, out);
+        
+        maskThat = _mm_cmpneq_ps(maskThis, maskThat);
+        maskThat = _mm_or_ps(maskThat, out);
 
         absThat = _mm_and_ps(that, abs);
 //        absThis = _mm_and_ps(thisOne, abs);
               
         lessThan = _mm_cmplt_ps(absThis, absThat);
-        
-        equal = _mm_cmpeq_ps(absThis, absThat);
-        
-        lessThan = _mm_or_ps(lessThan, equal);
         
         maskThat = _mm_and_ps(lessThan, maskThat);
         
@@ -707,7 +719,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     HysteresisQueue* queues = new HysteresisQueue[omp_get_max_threads()];
     
     for(int i = 0; i < omp_get_max_threads(); ++i) {
-      queues[i] = HysteresisQueue(buffer);
+      queues[i] = HysteresisQueue(buffer, offset);
       buffer += offset;
     }
     
