@@ -35,9 +35,6 @@
     <Compile Include="itkOpCannyEdgeDetectionImageFilter.h" />
     <Compile Include="itkOpGaussianOperator.txx" />
     <Compile Include="itkOpGaussianOperator.h" />
-    <Compile Include="..\..\..\opConvolution\src\opConvolutionFilter.cpp">
-      <Link>opConvolutionFilter.cpp</Link>
-    </Compile>
   </ItemGroup>
   <ProjectExtensions>
     <MonoDevelop>
@@ -63,8 +60,5 @@
   </ProjectExtensions>
   <ItemGroup>
     <None Include="main.cpp" />
-    <None Include="..\..\..\opConvolution\src\opConvolutionFilter.h">
-      <Link>opConvolutionFilter.h</Link>
-    </None>
   </ItemGroup>
 </Project>
