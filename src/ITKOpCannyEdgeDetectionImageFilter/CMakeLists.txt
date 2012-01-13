@@ -36,7 +36,10 @@ SET(LIBRARY_OUTPUT_PATH
 )
 
 #${PROJECT_SOURCE_DIR}/StopWatch.cpp ${PROJECT_SOURCE_DIR}/StopWatch.h)
-ADD_EXECUTABLE(opcanny ${PROJECT_SOURCE_DIR}/main.cpp) 
+ADD_EXECUTABLE(opcanny ${PROJECT_SOURCE_DIR}/main.cpp 
+                       ${PROJECT_SOURCE_DIR}/opConvolutionFilter.cpp 
+                       ${PROJECT_SOURCE_DIR}/opConvolutionFilter.h 
+                       ${PROJECT_SOURCE_DIR}/util.h) 
 ADD_LIBRARY(ITKOpCannyEdgeDetectionImageFilter SHARED ${PROJECT_SOURCE_DIR}/itkOpCannyEdgeDetectionImageFilter.txx 
                                                       ${PROJECT_SOURCE_DIR}/itkOpCannyEdgeDetectionImageFilter.h 
                                                       ${PROJECT_SOURCE_DIR}/itkOpGaussianOperator.txx 

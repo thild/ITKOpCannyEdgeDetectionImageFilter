@@ -26,6 +26,10 @@
 
 #include "itkStopWatch.h"
 
+#include "opConvolutionFilter.h"
+
+
+
 #include <omp.h>
 #include <smmintrin.h>
 #include <emmintrin.h>
@@ -54,6 +58,9 @@ OpCannyEdgeDetectionImageFilter()
   m_UpdateBuffer  = OutputImageType::New();  
   m_GaussianBuffer  = OutputImageType::New();  
   
+  m_BoundaryBuffer1  = OutputImageType::New();  
+  m_BoundaryBuffer2  = OutputImageType::New();  
+  
   //Initialize the list
   m_NodeStore = ListNodeStorageType::New();
   m_NodeList = ListType::New();
@@ -78,6 +85,24 @@ OpCannyEdgeDetectionImageFilter<TInputImage, TOutputImage>
   m_GaussianBuffer->SetRequestedRegion(input->GetRequestedRegion());
   m_GaussianBuffer->SetBufferedRegion(input->GetBufferedRegion());
   m_GaussianBuffer->Allocate();  
+
+    typename TInputImage::SizeType regionSize = 
+        input->GetRequestedRegion().GetSize();
+  
+  uint maxSide = regionSize[0] > regionSize[1] ? regionSize[0] : regionSize[1];
+
+  int stride = calculateAlignedStride (maxSide + 2, sizeof(InputImagePixelType), 16 ); 
+  regionSize[0] = stride;
+  regionSize[1] = 16;
+
+  m_BoundaryBuffer1->SetRequestedRegion(regionSize);
+  m_BoundaryBuffer1->SetBufferedRegion(regionSize);
+  m_BoundaryBuffer1->Allocate();  
+
+  m_BoundaryBuffer2->SetRequestedRegion(regionSize);
+  m_BoundaryBuffer2->SetBufferedRegion(regionSize);
+  m_BoundaryBuffer2->Allocate();  
+        
 }
  
 template <class TInputImage, class TOutputImage>
@@ -152,96 +177,54 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     typename TInputImage::SizeType regionSize = 
         input->GetRequestedRegion().GetSize();
           
-    int nWidth = regionSize[0];
     int nHeight = regionSize[1];
     int stride = input->GetOffsetTable()[1];
     
   this->AllocateUpdateBuffer();
-    
-    
-    // allocate 16 byte aligned buffers needed by SSE
-   // float*  buffer1 = AllocateAlignedBuffer (nWidth, nHeight);
-
-    // blur the image to reduce noise    
-//    GaussianBlur ( input->GetBufferPointer(), 
-//                   this->GetOutput(0)->GetBufferPointer() );
-  //printImage(nWidth, nHeight, nWidth, input->GetBufferPointer());    
   
-  m_Timer.Start();  
-  m_Timer.Checkpoint("Begin GaussianBlur");  
-    this->GaussianBlur ( input->GetBufferPointer(), m_GaussianBuffer->GetBufferPointer() );
-  m_Timer.Checkpoint("End GaussianBlur");  
+  StopWatch* sw = StopWatchPool::GetStopWatch("OpCannyEdgeDetectionImageFilter"); 
+  sw->StartNew();  
+  sw->AddCheckpoint("Begin GaussianBlur", true);  
+  // blur the image to reduce noise    
+  this->GaussianBlur ( input->GetBufferPointer(), m_GaussianBuffer->GetBufferPointer() );
+  sw->AddCheckpoint("GaussianBlur");  
     
-//  cout << "Gaussian OpCanny" << endl;
-//  gaussianKernel1D();
-//  printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());    
   //2. Calculate 2nd order directional derivative-------
   // Calculate the 2nd order directional derivative of the smoothed image.
   // The output of this filter will be used to store the directional
   // derivative.
-//  cout << "Compute2ndDerivative OpCanny" << endl;
-  m_Timer.Checkpoint("Begin Compute2ndDerivative");  
+  sw->AddCheckpoint("Begin Compute2ndDerivative", true);  
   this->Compute2ndDerivative();    
-  m_Timer.Checkpoint("End Compute2ndDerivative");  
-//  printImage(nWidth, nHeight, stride, this->GetOutput()->GetBufferPointer());     
+  sw->AddCheckpoint("Compute2ndDerivative");  
   
-//  cout << "Compute2ndDerivativePos OpCanny" << endl;
-  m_Timer.Checkpoint("Begin Compute2ndDerivativePos");  
+  sw->AddCheckpoint("Begin Compute2ndDerivativePos", true);  
   this->Compute2ndDerivativePos();    
-  m_Timer.Checkpoint("End Compute2ndDerivativePos");  
-//  printImage(nWidth, nHeight, stride, m_UpdateBuffer->GetBufferPointer());     
-//  printImage(nWidth, nHeight, nWidth, m_UpdateBuffer->GetBufferPointer());    
+  sw->AddCheckpoint("Compute2ndDerivativePos");
 
-
-//  cout << "ZeroCrossing OpCanny" << endl;
-  m_Timer.Checkpoint("Begin ZeroCrossing");  
+  sw->AddCheckpoint("Begin ZeroCrossing", true);  
   this->ZeroCrossing();    
-  m_Timer.Checkpoint("End ZeroCrossing");  
-//  printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());     
-//
-//  cout << "Multiply OpCanny" << endl;
-  m_Timer.Checkpoint("Begin Multiply");  
+  sw->AddCheckpoint("ZeroCrossing");  
+  
+  sw->AddCheckpoint("Begin Multiply", true);
   this->Multiply(stride, nHeight,  
                  m_UpdateBuffer->GetBufferPointer(), 
                  m_GaussianBuffer->GetBufferPointer(), 
                  m_GaussianBuffer->GetBufferPointer());    
-  m_Timer.Checkpoint("End Multiply");  
+  sw->AddCheckpoint("Multiply");  
                  
-  // printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());     
-                 
-                 
-  m_Timer.Checkpoint("Begin HysteresisThresholding");  
+  sw->AddCheckpoint("Begin HysteresisThresholding", true);
+  StopWatch b;
+  b.Start();
   this->HysteresisThresholding();                    
-  m_Timer.Checkpoint("End HysteresisThresholding");  
-  //printImage(nWidth, nHeight, stride, this->GetOutput()->GetBufferPointer());     
+  b.Stop();
+  sw->AddCheckpoint("HysteresisThresholding");
                  
-  m_Timer.Stop();
-//  printImage(nWidth, nHeight, stride, m_GaussianBuffer->GetBufferPointer());     
-
+  sw->Stop();
+  sw->Stop();
 }
 
 
-template< class TInputImage, class TOutputImage >
-int 
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::CalculateAlignedStride (int width, int height, int typeSize, int alignInBytes)
-{
- 
- if(width < alignInBytes) return alignInBytes;
 
-    //TODO: see if cache line size align works and is faster
-    int wBytes = width * typeSize;
-    int sPixel = typeSize;
-    //http://stackoverflow.com/questions/1855896/memory-alignment-on-modern-processors
-    //http://cboard.cprogramming.com/c-programming/105136-memory-granularity-processor.html
-    //((width * bytesPerPixel) + 3) & ~3; /* Aligned to 4 bytes */
-    //int bytesPerPixel = typeSize;
-    //int a = ((width * bytesPerPixel) + alignInBytes) & ~alignInBytes; /* Aligned to 4 bytes */
-    //PRINT(a/sPixel); 
-    //return a;
-    //PRINT((wBytes + alignInBytes - (wBytes % alignInBytes)) / sPixel);
-    return wBytes % alignInBytes == 0 ? width : (wBytes + alignInBytes - (wBytes % alignInBytes)) / sPixel;
-}
 
 
 // Calculate the second derivative
@@ -250,19 +233,107 @@ void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 ::Compute2ndDerivative() 
 {
+//    return;
+  typename TInputImage::SizeType regionSize = 
+  this->GetInput()->GetRequestedRegion().GetSize();
+    
+  const int imageWidth = regionSize[0];
+  const int imageHeight = regionSize[1];
+  const int imageStride = this->GetInput()->GetOffsetTable()[1]; 
+  
+  float* inputImage  = m_GaussianBuffer->GetBufferPointer(); 
+  float* outputImage = this->GetOutput()->GetBufferPointer();
+//  printImage(imageWidth, imageHeight, imageStride, inputImage);
+  
+  Compute2ndDerivative(imageStride, imageWidth, imageHeight, inputImage, outputImage, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
 
-    typename TInputImage::SizeType regionSize = 
-        this->GetInput()->GetRequestedRegion().GetSize();
-          
-    int imageWidth = regionSize[0];
-    int imageHeight = regionSize[1];
+  float* boundaryImage = m_BoundaryBuffer1->GetBufferPointer(); 
+  
+    
+//void copy2DBoundaryChunk(const float* inBuffer, float* outBuffer,
+//                           const int outStride, const int outWidth, const int outHeight, 
+//                           const int replicateLeft, const int replicateTop,
+//                           const int replicateRight, const int replicateBottom,
+//                           const int inStride,  const int inWidth, const int inHeight);        
+  //left boundaries
+  int stride = calculateAlignedStride (6, sizeof(InputImagePixelType), 16 ); 
+  
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, 6, imageHeight + 2, 
+                     1, 1,
+                     0, 1,
+                     imageStride, imageWidth, imageHeight);  
+                      
+                      
+                      
+//  printImage(6, imageHeight + 2, stride, boundaryImage);
+  Compute2ndDerivative(stride, 6, imageHeight + 2, boundaryImage, outputImage - imageStride - 1, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+   
+  //right boundaries
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, 6, imageHeight + 2, 
+                     0, 1,
+                     1, 1,
+                     imageStride, imageWidth, imageHeight);  
+  
+//  printImage(6, imageHeight + 2, stride, boundaryImage);
+  Compute2ndDerivative(stride, 6, imageHeight + 2, boundaryImage, outputImage - imageStride + imageWidth - 5, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+  
+  stride = calculateAlignedStride (imageWidth + 2, sizeof(InputImagePixelType), 16 ); 
+  
+  //top boundaries
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, imageWidth + 2, 3, 
+                     1, 1,
+                     1, 0,
+                     imageStride, imageWidth, imageHeight);  
+  
+//  printImage(imageWidth + 2, 3, stride, boundaryImage);
+  Compute2ndDerivative(stride, imageWidth + 2, 3, boundaryImage, outputImage - imageStride - 1, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+  
+  //bottom boundaries
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, imageWidth + 2, 3, 
+                     1, 0,
+                     1, 1,
+                     imageStride, imageWidth, imageHeight);  
+  
+//  printImage(imageWidth + 2, 3, stride, boundaryImage);
+  Compute2ndDerivative(stride, imageWidth + 2, 3, boundaryImage, outputImage + (imageHeight - 2) * imageStride - 1, imageStride);
+//  cout << "aqui" << endl;
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+}
 
-    float* inputImage  = m_GaussianBuffer->GetBufferPointer(); 
-    float* outputImage = this->GetOutput()->GetBufferPointer();
+ 
+ 
+
+
+
+// Calculate the second derivative
+template< class TInputImage, class TOutputImage >
+void
+OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
+::Compute2ndDerivative(const int imageStride, const int imageWidth, 
+                       const int imageHeight, 
+                       const float* inputImage, float* outputImage, const int outStride) 
+{ 
+//    return;
+//    typename TInputImage::SizeType regionSize = 
+//        this->GetInput()->GetRequestedRegion().GetSize();
+//          
+//    int imageWidth = regionSize[0];
+//    int imageHeight = regionSize[1];
+// 
+//    float* inputImage  = m_GaussianBuffer->GetBufferPointer(); 
+//    float* outputImage = this->GetOutput()->GetBufferPointer();
     
     const int kernelWidth = 3;
     const int halfKernel = kernelWidth / 2;
-    const int imageStride = this->GetInput()->GetOffsetTable()[1];
+//    const int imageStride = this->GetInput()->GetOffsetTable()[1];
     
     int startX  = 0;
     int stopX   = imageWidth - 2 * halfKernel;
@@ -376,70 +447,140 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         //K
         inv0 = inv0 / inv1;                                                     
         
-        _mm_storeu_ps(&outputImage[(y + halfKernel) * imageStride + (x + halfKernel)], inv0); 
+        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], inv0); 
         
             
     }
   }
-  
-  Compute2ndDerivativeBondaries(imageStride, imageWidth, 
-                                imageHeight, inputImage, inputImage,
-                                outputImage);    
-}
-
-// Calculate the second derivative
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::Compute2ndDerivativeBondaries(const int imageStride, const int imageWidth, 
-                                const int imageHeight, 
-                                const float* gaussianImage, const float* dxImage, 
-                                float* outputImage) {
-  
-        for(int x = 0; x < imageWidth; ++x) {
-          if(x == 0){
-          
-          }  
-          else if(x == imageWidth - 1){
-          
-          }  
-          outputImage[x] = 0;
-          outputImage[(imageHeight - 1) * imageStride + x] = 0;
-        }
-        
-        for(int y = 1; y < imageHeight - 1; ++y) {
-          if(y == 0){
-          
-          }  
-          else if(y == imageHeight - 1){
-          
-          }  
-          outputImage[y * imageStride] = 0;
-          outputImage[y * imageStride + (imageWidth - 1)] = 0;
-        }
 }
 
 
-
+ 
 template< class TInputImage, class TOutputImage >
 void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::Compute2ndDerivativePos()
+::Compute2ndDerivativePos() 
+{
+//    return;
+  typename TInputImage::SizeType regionSize = 
+  this->GetInput()->GetRequestedRegion().GetSize();
+    
+  const int imageWidth = regionSize[0];
+  const int imageHeight = regionSize[1];
+  const int imageStride = this->GetInput()->GetOffsetTable()[1]; 
+  
+  float* gaussianInput = m_GaussianBuffer->GetBufferPointer();
+  float* dxInput = this->GetOutput()->GetBufferPointer();
+  float* outputImage  = m_UpdateBuffer->GetBufferPointer();
+  
+//  printImage(imageWidth, imageHeight, imageStride, gaussianInput);
+//  printImage(imageWidth, imageHeight, imageStride, dxInput);
+  
+  Compute2ndDerivativePos(imageStride, imageWidth, imageHeight, gaussianInput, dxInput, outputImage, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+
+  float* bGaussianInput = m_BoundaryBuffer1->GetBufferPointer();  
+  float* bDxInput = m_BoundaryBuffer2->GetBufferPointer(); 
+  
+    
+//void copy2DBoundaryChunk(const float* inBuffer, float* outBuffer,
+//                           const int outStride, const int outWidth, const int outHeight, 
+//                           const int replicateLeft, const int replicateTop,
+//                           const int replicateRight, const int replicateBottom,
+//                           const int inStride,  const int inWidth, const int inHeight);        
+  //left boundaries
+  
+  int stride = calculateAlignedStride (6, sizeof(InputImagePixelType), 16 ); 
+  
+  copy2DBoundaryChunk(gaussianInput, bGaussianInput,
+                     stride, 6, imageHeight + 2, 
+                     1, 1,
+                     0, 1, 
+                     imageStride, imageWidth, imageHeight);  
+                      
+  copy2DBoundaryChunk(dxInput, bDxInput,
+                     stride, 6, imageHeight + 2, 
+                     1, 1,
+                     0, 1,
+                     imageStride, imageWidth, imageHeight);   
+                      
+//  printImage(6, imageHeight + 2, stride, bGaussianInput);
+//  printImage(6, imageHeight + 2, stride, bDxInput);
+  
+  Compute2ndDerivativePos(stride, 6, imageHeight + 2, bGaussianInput, bDxInput, outputImage - imageStride - 1, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+   
+  //right boundaries
+  copy2DBoundaryChunk(gaussianInput, bGaussianInput,
+                     stride, 6, imageHeight + 2, 
+                     0, 1,
+                     1, 1,
+                     imageStride, imageWidth, imageHeight);  
+  
+  copy2DBoundaryChunk(dxInput, bDxInput,
+                     stride, 6, imageHeight + 2, 
+                     0, 1,
+                     1, 1,
+                     imageStride, imageWidth, imageHeight);  
+  
+//  printImage(6, imageHeight + 2, stride, bGaussianInput);
+//  printImage(6, imageHeight + 2, stride, bDxInput);
+  Compute2ndDerivativePos(stride, 6, imageHeight + 2, bGaussianInput, bDxInput, outputImage - imageStride + imageWidth - 5, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+  
+  
+  stride = calculateAlignedStride (imageWidth + 2, sizeof(InputImagePixelType), 16 ); 
+  
+  //top boundaries
+  copy2DBoundaryChunk(gaussianInput, bGaussianInput,
+                     stride, imageWidth + 2, 3, 
+                     1, 1,
+                     1, 0,
+                     imageStride, imageWidth, imageHeight);  
+  
+  copy2DBoundaryChunk(dxInput, bDxInput,
+                     stride, imageWidth + 2, 3, 
+                     1, 1,
+                     1, 0, 
+                     imageStride, imageWidth, imageHeight);  
+  
+//  printImage(imageWidth + 2, 3, stride, bGaussianInput);
+//  printImage(imageWidth + 2, 3, stride, bDxInput);
+  Compute2ndDerivativePos(stride, imageWidth + 2, 3, bGaussianInput, bDxInput, outputImage - imageStride - 1, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+  
+  //bottom boundaries
+  copy2DBoundaryChunk(gaussianInput, bGaussianInput,
+                     stride, imageWidth + 2, 3, 
+                     1, 0,
+                     1, 1,
+                     imageStride, imageWidth, imageHeight);  
+  
+  copy2DBoundaryChunk(dxInput, bDxInput,
+                     stride, imageWidth + 2, 3, 
+                     1, 0,
+                     1, 1,
+                     imageStride, imageWidth, imageHeight);  
+   
+//  printImage(imageWidth + 2, 3, stride, bGaussianInput);
+//  printImage(imageWidth + 2, 3, stride, bDxInput);
+  Compute2ndDerivativePos(stride, imageWidth + 2, 3, bGaussianInput, bDxInput, outputImage + (imageHeight - 2) * imageStride - 1, imageStride);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+}
+
+ 
+ 
+template< class TInputImage, class TOutputImage >
+void
+OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
+::Compute2ndDerivativePos(const int imageStride, const int imageWidth, 
+                       const int imageHeight, 
+                       const float* gaussianInput, const float* dxInput,
+                       float* outputImage, const int outStride)
 {
 
-  typename TInputImage::SizeType regionSize = 
-        this->GetInput()->GetRequestedRegion().GetSize();
-          
-    int imageWidth = regionSize[0];
-    int imageHeight = regionSize[1];
-
-    float* gaussianInput = m_GaussianBuffer->GetBufferPointer();
-    float* dxInput = this->GetOutput()->GetBufferPointer();
-    float* outputImage  = m_UpdateBuffer->GetBufferPointer();
-    
     const int kernelWidth = 3;
     const int halfKernel = kernelWidth / 2;
-    const int imageStride = this->GetInput()->GetOffsetTable()[1];
     
     int startX  = 0;
     int stopX   = imageWidth - 2 * halfKernel;
@@ -529,44 +670,217 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         static const __m128 one = _mm_set1_ps(0x00000001);
         derivPos = _mm_and_ps(derivPos, one);
         derivPos = derivPos * gradMag;
-        _mm_storeu_ps(&outputImage[(y + halfKernel) * imageStride + (x + halfKernel)], derivPos); 
+        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], derivPos); 
     }
   }
-  
-//  Compute2ndDerivativePosBondaries(imageStride, imageWidth, 
-//                                   imageHeight, dxInput, gaussianInput,
-//                                   outputImage);  
 }
 
+
+
+//
+//// Calculate the second derivative
+//template< class TInputImage, class TOutputImage >
+//void
+//OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
+//::ZeroCrossing() 
+//{
+////    return;
+//  typename TInputImage::SizeType regionSize = 
+//  this->GetInput()->GetRequestedRegion().GetSize();
+//    
+//  const int imageWidth = regionSize[0];
+//  const int imageHeight = regionSize[1];
+//  const int imageStride = this->GetInput()->GetOffsetTable()[1]; 
+//  
+//  float* inputImage = this->GetOutput()->GetBufferPointer();
+//  float* outputImage  = m_GaussianBuffer->GetBufferPointer();
+////  printImage(imageWidth, imageHeight, imageStride, inputImage);
+//  
+//  ZeroCrossing(imageStride, imageWidth, imageHeight, inputImage, outputImage, imageStride);
+////  printImage(imageWidth, imageHeight, imageStride, outputImage);
+//
+//  float* boundaryImage = m_BoundaryBuffer1->GetBufferPointer(); 
+//  
+//    
+////void copy2DBoundaryChunk(const float* inBuffer, float* outBuffer,
+////                           const int outStride, const int outWidth, const int outHeight, 
+////                           const int replicateLeft, const int replicateTop,
+////                           const int replicateRight, const int replicateBottom,
+////                           const int inStride,  const int inWidth, const int inHeight);        
+//  //left boundaries
+//  int stride = calculateAlignedStride (12, sizeof(InputImagePixelType), 16 ); 
+//  
+//  copy2DBoundaryChunk(inputImage, boundaryImage,
+//                     stride, 12, imageHeight + 2, 
+//                     4, 1,
+//                     0, 1,
+//                     imageStride, imageWidth, imageHeight);  
+//                      
+////  printImage(12, imageHeight + 2, stride, boundaryImage);
+//  ZeroCrossing(stride, 12, imageHeight + 2, boundaryImage, outputImage - imageStride - 4, imageStride);
+////  cout << "left boundaries" << endl;
+////  printImage(imageWidth, imageHeight, imageStride, outputImage);
+//
+//  //right boundaries
+//  copy2DBoundaryChunk(inputImage, boundaryImage,
+//                     stride, 12, imageHeight + 2, 
+//                     0, 1,
+//                     4, 1,
+//                     imageStride, imageWidth, imageHeight);  
+//  
+//  
+////  printImage(12, imageHeight + 2, stride, boundaryImage);
+//  ZeroCrossing(stride, 12, imageHeight + 2, boundaryImage, outputImage - imageStride + imageWidth - 8, imageStride);
+////  cout << "right boundaries" << endl;
+////  printImage(imageWidth, imageHeight, imageStride, outputImage);
+//  
+//  stride = calculateAlignedStride (imageWidth + 8, sizeof(InputImagePixelType), ALIGMENT_BYTES ); 
+//  
+//  //top boundaries
+//  copy2DBoundaryChunk(inputImage, boundaryImage,
+//                     stride, imageWidth + 8, 3, 
+//                     4, 1,
+//                     4, 0,
+//                     imageStride, imageWidth, imageHeight);  
+//  
+////  printImage(imageWidth + 8, 3, stride, boundaryImage);
+//  ZeroCrossing(stride, imageWidth + 8, 3, boundaryImage, outputImage - imageStride - 4, imageStride);
+////  cout << "top boundaries" << endl;
+////  printImage(imageWidth, imageHeight, imageStride, outputImage);
+//  
+//  //bottom boundaries
+//  copy2DBoundaryChunk(inputImage, boundaryImage,
+//                     stride, imageWidth + 8, 3, 
+//                     4, 0,
+//                     4, 1,
+//                     imageStride, imageWidth, imageHeight);  
+//  
+////  printImage(imageWidth + 8, 3, stride, boundaryImage);
+//  ZeroCrossing(stride, imageWidth + 8, 3, boundaryImage, outputImage + (imageHeight - 2) * imageStride - 4, imageStride);
+////  cout << "bottom boundaries" << endl;
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);  
+//}
+
+
+// Calculate the second derivative
+template< class TInputImage, class TOutputImage >
+void
+OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
+::ZeroCrossing() 
+{
+//    return;
+  typename TInputImage::SizeType regionSize = 
+  this->GetInput()->GetRequestedRegion().GetSize();
+    
+  const int imageWidth = regionSize[0];
+  const int imageHeight = regionSize[1];
+  const int imageStride = this->GetInput()->GetOffsetTable()[1]; 
+  
+  float* inputImage = this->GetOutput()->GetBufferPointer();
+  float* outputImage  = m_GaussianBuffer->GetBufferPointer();
+//  printImage(imageWidth, imageHeight, imageStride, inputImage);
+  
+  ZeroCrossing(imageStride, imageWidth, imageHeight, inputImage, outputImage, imageStride, 0, 0);
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+
+  float* boundaryImage = m_BoundaryBuffer1->GetBufferPointer(); 
+  
+    
+//void copy2DBoundaryChunk(const float* inBuffer, float* outBuffer,
+//                           const int outStride, const int outWidth, const int outHeight, 
+//                           const int replicateLeft, const int replicateTop,
+//                           const int replicateRight, const int replicateBottom,
+//                           const int inStride,  const int inWidth, const int inHeight);        
+
+  int stride = calculateAlignedStride (imageWidth, sizeof(InputImagePixelType), 16 ); 
+  
+  //top boundaries
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, imageWidth, 3, 
+                     0, 1,
+                     0, 0,
+                     imageStride, imageWidth, imageHeight);  
+  
+//  printImage(imageWidth + 8, 3, stride, boundaryImage);
+  ZeroCrossing(stride, imageWidth, 3, boundaryImage, outputImage - imageStride, imageStride, 0, 0);
+//  cout << "top boundaries" << endl;
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+  
+  //bottom boundaries
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, imageWidth, 3,  
+                     0, 0,
+                     0, 1,
+                     imageStride, imageWidth, imageHeight);  
+                     
+  
+//  printImage(imageWidth + 8, 3, stride, boundaryImage);
+  ZeroCrossing(stride, imageWidth, 3, boundaryImage, outputImage + (imageHeight - 2) * imageStride, imageStride, 0, 0);
+//  cout << "bottom boundaries" << endl;
+  
+  //left boundaries
+  stride = calculateAlignedStride (12, sizeof(InputImagePixelType), 16 ); 
+  
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, 12, imageHeight + 2, 
+                     4, 1,
+                     0, 1,
+                     imageStride, imageWidth, imageHeight);  
+                      
+//  printImage(12, imageHeight + 2, stride, boundaryImage);
+  ZeroCrossing(stride, 12, imageHeight + 2, boundaryImage, outputImage - imageStride - 4, imageStride, 4, 8);
+//  cout << "left boundaries" << endl;
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);
+
+  //right boundaries
+  copy2DBoundaryChunk(inputImage, boundaryImage,
+                     stride, 12, imageHeight + 2, 
+                     0, 1,
+                     4, 1,
+                     imageStride, imageWidth, imageHeight);  
+  
+  
+//  printImage(12, imageHeight + 2, stride, boundaryImage);
+  ZeroCrossing(stride, 12, imageHeight + 2, boundaryImage, outputImage - imageStride + imageWidth - 8, imageStride, 4, 8);
+//  cout << "right boundaries" << endl;
+//  printImage(imageWidth, imageHeight, imageStride, outputImage); 
+  
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);  
+}
+ 
+
+ 
 
 template< class TInputImage, class TOutputImage >
 void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::ZeroCrossing()
+::ZeroCrossing(const int imageStride, const int imageWidth, 
+               const int imageHeight, 
+               const float* inputImage, float* outputImage, const int outStride, const int startX, const int stopX)
 {
+//  return;
+//  typename TInputImage::SizeType regionSize = 
+//        this->GetInput()->GetRequestedRegion().GetSize();
+//          
+//    int imageWidth = regionSize[0];
+//    int imageHeight = regionSize[1];
 
-  typename TInputImage::SizeType regionSize = 
-        this->GetInput()->GetRequestedRegion().GetSize();
-          
-    int imageWidth = regionSize[0];
-    int imageHeight = regionSize[1];
-
-    float* inputImage = this->GetOutput()->GetBufferPointer();
-    float* outputImage  = m_GaussianBuffer->GetBufferPointer();
+//    float* inputImage = this->GetOutput()->GetBufferPointer();
+//    float* outputImage  = m_GaussianBuffer->GetBufferPointer();
 
     const int kernelWidth = 3;
     const int halfKernel = kernelWidth / 2;
-    const int imageStride = this->GetInput()->GetOffsetTable()[1];
+//    const int imageStride = this->GetInput()->GetOffsetTable()[1];
     
-    int startX  = 4;
-    int stopX   = (imageWidth - 2 * halfKernel) - 4;
+//    int startX  = 0;
+    int sstopX   = stopX ? stopX : (imageWidth - 2 * halfKernel);
     int startY  = 0;
     int stopY   = imageHeight - 2 * halfKernel;
 
       
     #pragma omp parallel for shared (inputImage, outputImage) 
     for (int y = startY; y < stopY; ++y) {
-      for (int x = startX; x < stopX; x += 4) {
+      for (int x = startX; x < sstopX; x += 4) {
         static const __m128 sign = _mm_castsi128_ps(_mm_set1_epi32(0x80000000));
         static const __m128 one = _mm_set1_ps(0x00000001);
         static const __m128 abs = _mm_castsi128_ps(_mm_set1_epi32(0x7FFFFFFF));
@@ -592,7 +906,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         __m128 out = _mm_and_ps(lessThan, maskThat);
         
         if (_mm_movemask_ps(out) == 0xf) {
-          _mm_storeu_ps(&outputImage[(y + 1) * imageStride + x], _mm_and_ps(out, one)); 
+          out = _mm_and_ps(out, one);
+          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
           continue;
         }
         
@@ -618,7 +933,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         out = _mm_or_ps(maskThat, out);
         
         if (_mm_movemask_ps(out) == 0xf) {
-          _mm_storeu_ps(&outputImage[(y + 1) * imageStride + x], _mm_and_ps(out, one)); 
+          out = _mm_and_ps(out, one);
+          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
           continue;
         }
 
@@ -644,7 +960,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         
         
         if (_mm_movemask_ps(out) == 0xf) {
-          _mm_storeu_ps(&outputImage[(y + 1) * imageStride + x], _mm_and_ps(out, one)); 
+          out = _mm_and_ps(out, one);
+          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
           continue;
         }
         
@@ -665,8 +982,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         maskThat = _mm_and_ps(lessThan, maskThat);
         
         out = _mm_or_ps(maskThat, out);
-        
-        _mm_storeu_ps(&outputImage[(y + 1) * imageStride + x], _mm_and_ps(out, one)); 
+        out = _mm_and_ps(out, one);
+        _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
         
             
     }
@@ -683,7 +1000,7 @@ void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 ::HysteresisThresholding()
 {
-
+//  return;
   typename TInputImage::SizeType regionSize = 
         this->GetInput()->GetRequestedRegion().GetSize();
           
@@ -698,25 +1015,30 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 
     const int imageStride = this->GetInput()->GetOffsetTable()[1]; 
 
-    ClearBuffer( outputImage, 
-                 imageStride, 
-                 imageHeight );
+    clear2DBuffer(outputImage, 
+                  imageStride, 
+                  imageHeight );
     
-    ClearBuffer( m_UpdateBuffer->GetBufferPointer(), 
-                 imageStride, 
-                 imageHeight );
+    clear2DBuffer(m_UpdateBuffer->GetBufferPointer(), 
+                  imageStride, 
+                  imageHeight );
     
     PRINT(imageWidth);
     
     int startX  = 0;
-    int stopX   = imageWidth;
+    int stopX   = imageWidth - 4;
     int startY  = 0;
     int stopY   = imageHeight;
-
-    HysteresisEdgeIndex* buffer = (HysteresisEdgeIndex*)(m_UpdateBuffer->GetBufferPointer());
-    int offset = imageHeight / omp_get_num_threads();
     
-    HysteresisQueue* queues = new HysteresisQueue[omp_get_max_threads()];
+//    cout << imageWidth << " x " << imageHeight << endl;
+
+//    HysteresisEdgeIndex* buffer = (HysteresisEdgeIndex*)(m_UpdateBuffer->GetBufferPointer());
+//    HysteresisQueue queue = HysteresisQueue(buffer, imageStride * imageHeight - 1);
+      
+    HysteresisEdgeIndex* buffer = (HysteresisEdgeIndex*)(m_UpdateBuffer->GetBufferPointer());
+    int offset = (imageStride * imageHeight) / omp_get_max_threads();
+    
+    HysteresisQueue* queues = new HysteresisQueue[omp_get_max_threads()]; 
     
     for(int i = 0; i < omp_get_max_threads(); ++i) {
       queues[i] = HysteresisQueue(buffer, offset);
@@ -724,11 +1046,12 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     }
     
     #pragma omp parallel for shared (queues, inputImage, outputImage)  
-    for (int y = startY; y < stopY; ++y) {
-      HysteresisQueue queue = queues[omp_get_thread_num()];
+    for (int y = startY; y < stopY; ++y) { 
+        HysteresisQueue queue = queues[omp_get_thread_num()];
         const register __m128 upperThreshold = _mm_set1_ps(m_UpperThreshold);
-        
-      for (int x = startX; x < stopX; x += 4) {
+      
+      int x = startX;
+      for (; x < stopX; x += 4) {
         
         __m128 value = _mm_load_ps(&inputImage[y * imageStride + x]);      PRINT_VECTOR(thisOne);
         
@@ -759,7 +1082,19 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
           FollowEdge(imageStride, imageWidth, imageHeight, queue, inputImage, outputImage);
         } 
       }
+      
+      x -= 3;
+      //cout << x << endl;      
+      for (; x < imageWidth; ++x) {
+        if(inputImage[y * imageStride + x] > m_UpperThreshold) {
+          queue.Enqueue(x, y);
+          FollowEdge(imageStride, imageWidth, imageHeight, queue, inputImage, outputImage);
+        }
+      }
+      
     }
+//  printImage(imageWidth, imageHeight, imageStride, outputImage);  
+    
 }
 
 template< class TInputImage, class TOutputImage >
@@ -786,6 +1121,10 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         idx = queue.Dequeue();
         x = idx->X;
         y = idx->Y;
+//        if (x >= imageWidth || y >= imageHeight) {
+//          cout << x << " " << y << "; " << flush;
+////          return;
+//        }
         VerifyEdge(x, y, imageStride, imageWidth, imageHeight, queue,
                    input, output);
     }
@@ -798,6 +1137,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
              float* input, float* output)
 {
       int i;
+//      cout << "x: " << x << " y: " << y << "; ";
+      
       output[y * imageStride + x] = 1;
 
       if(x > 0) {
@@ -827,7 +1168,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
       }
 
-      if(x < imageWidth && y > 0) {
+      if(x < imageWidth - 1 && y > 0) {
         i = (y - 1) * imageStride + x + 1; //north east
         if(input[i] > m_LowerThreshold && 
            output[i] != 1) {
@@ -836,7 +1177,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
       }
                         
-      if(x < imageWidth) {
+      if(x < imageWidth - 1) {
         i = y * imageStride + x + 1; //east
         if(input[i] > m_LowerThreshold && 
            output[i] != 1) {
@@ -845,7 +1186,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
       }
                         
-      if(x < imageWidth && y < imageHeight) {
+      if(x < imageWidth - 1 && y < imageHeight - 1) {
         i = (y + 1) * imageStride + x + 1; //south east
         if(input[i] > m_LowerThreshold && 
            output[i] != 1) {
@@ -854,7 +1195,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
       }
                         
-      if(y < imageHeight) {
+      if(y < imageHeight - 1) {
         i = (y + 1) * imageStride + x; //south
         if(input[i] > m_LowerThreshold && 
            output[i] != 1) {
@@ -863,7 +1204,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
       }
                         
-      if(x > 0 && y < imageHeight) {
+      if(x > 0 && y < imageHeight - 1) {
         i = (y + 1) * imageStride + x - 1; //south west
         if(input[i] > m_LowerThreshold && 
            output[i] != 1) {
@@ -872,36 +1213,6 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
       }
 }
-
-
-
-template< class TInputImage, class TOutputImage >
-int 
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::CalculateAlignedChunk ( int height )
-{
-    int chunk = height / omp_get_num_procs();
-    return chunk % 64 == 0 ? chunk : (chunk + 64 - (chunk % 64)) / height;
-}
-
-template< class TInputImage, class TOutputImage >
-float* 
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::AllocateAlignedBuffer ( int width, int height )
-{
-    int stride = CalculateAlignedStride (width, height, sizeof(float), ALIGMENT_BYTES);
-    //aligned in 64 bytes for cache performance in Intel Core architecture
-    //since 64 bytes is a multiple of 16 bytes, SSE alignment will be preserved  
-#if defined(__GNUC__)  && !defined(__INTEL_COMPILER)  
-    float *buffer __attribute__ ((aligned(ALIGMENT_BYTES))) = new float[stride * height];
-#elif defined __INTEL_COMPILER  
-    __declspec(align(ALIGMENT_BYTES)) float *buffer = new float[stride * height];
-#endif
-    
-    return buffer;
-}
-
-
 
 template< class TInputImage, class TOutputImage >
 void
@@ -914,175 +1225,14 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     int height = regionSize[1];
     
     float* kernel = gaussianKernel1D ();
-    int imageStride = CalculateAlignedStride ( width, height, sizeof(float), ALIGMENT_BYTES ); 
-    scGaussian7SSE (imageStride, width, height, 
-                    input, output, kernel);
+    int kw = GetGaussianKernelWidth();
+    int imageStride = calculateAlignedStride ( width, sizeof(InputImagePixelType), ALIGMENT_BYTES ); 
+    
+    opSeparableConvolve (imageStride, width, height, kw,
+                         input, output, kernel, kernel);
+//  printImage(width, height, imageStride, output);
+                         
 }
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::ComputeGradient(const float* input, float* output)
-{
-    PRINT_LABEL ("ComputeGradient");
-    typename TInputImage::SizeType regionSize = this->GetInput()->GetRequestedRegion().GetSize();
-    int width = regionSize[0];
-    int height = regionSize[1];    
-    
-    int stride = CalculateAlignedStride ( width, height ); 
-    
-    const float* in = input;
-    // create temporary buffers
-    float* tempGx = AllocateAlignedBuffer ( width, height );
-    float* tempGy = AllocateAlignedBuffer ( width, height );
-    
-     // kernel
-    int radius = m_GaussianKernelWidth / 2 + 1;
-    int gaussianRadius = m_GaussianKernelWidth / 2 * 2;
-    
-    int startX  = 0;
-    int stopX   = width - (2 * radius); 
-    int startY  = 0;
-    int stopY   = height - gaussianRadius;   
-    
-    // ### Calculates the x gaussian
-    __m128i kvGx = _mm_set_epi32 ( 0, -1, 0, 1 );   // kernel gx
-    __m128i kvGy = _mm_set_epi32 ( 0, 1, 2, 1 );    // kernel gy
-    
-    PRINT_LABEL ("Gradient x - row order");
-    #ifndef DEBUG
-    #pragma omp parallel for num_threads(omp_get_num_procs()) shared (in, tempGx, tempGy, kvGx, kvGy) 
-    #endif
-    for (int y = startY; y < stopY; ++y)
-    {
-        PRINT_LINE();
-        for (int x = startX; x < stopX; ++x)
-        {
-        
-            int idxT = y * stride + x;
-            // gx
-            __m128i inv = _mm_setzero_si128(); // create input vector and set to zero
-            inv = _mm_loadu_si128 ( ( __m128i *) &in[y * stride + x]); // load groups of four floats
-            __m128i r =  _mm_cvtps_epi32 (_mm_dp_ps ( _mm_cvtepi32_ps (kvGx), 
-                                                      _mm_cvtepi32_ps (inv), 
-                                                      241 )); //calculate dot procuct and store in kvGx[0]
-            tempGx[idxT] = _mm_extract_epi32 (r, 0); // extract the r[0]
-            PRINT_INLINE ("gx:");
-            PRINT_INLINE (tempGx[idxT]);
-            
-            // gy
-            r =  _mm_cvtps_epi32 (_mm_dp_ps ( _mm_cvtepi32_ps (kvGy), 
-                                              _mm_cvtepi32_ps (inv), 
-                                              241 )); //calculate dot procuct and store in kvGy[0]
-            tempGy[idxT] = _mm_extract_epi32 (r, 0); // extract the r[0]           
-            PRINT_INLINE ("gy:");
-            PRINT_INLINE (tempGy[idxT]);
-        }    
-    }
-                                    
-    float* gx = tempGx;
-    float* gy = tempGy;
-    
-    startX  = 0;
-    stopX  = width - 2 * radius;  
-
-    startY  = 0;
-    stopY   = height - 2 * radius;      
-
-    kvGx = _mm_set_epi32( 0, 1, 2, 1 );
-    kvGy = _mm_set_epi32( 0, -1, 0, 1 );
-
-    PRINT_LABEL ("Gradiente y - col order");
-    
-    // ### Calculates the y gaussian
-    #ifndef DEBUG
-    #pragma omp parallel for num_threads(omp_get_num_procs()) shared (tempGx, tempGy, kvGx, kvGy) 
-    #endif
-    for (int y = startY; y < stopY; ++y) {
-        PRINT_LINE();
-        int m, xx, yy;
-        for (int x = startX; x < stopX; ++x)   {
-            int idxI = y * stride + x;
-            //gx
-            __m128i inv = _mm_setzero_si128(); // create input vector and set to zero
-            inv = _mm_insert_epi32 (inv, gx[idxI], 0);
-            inv = _mm_insert_epi32 (inv, gx[idxI + stride] , 1);
-            inv = _mm_insert_epi32 (inv, gx[idxI + 2 * stride], 2);
-
-            __m128i r =  _mm_cvtps_epi32 (_mm_dp_ps ( _mm_cvtepi32_ps (kvGx), 
-                                                _mm_cvtepi32_ps (inv), 
-                                                241 )); // calculate dot procuct and store in kvGx[0]
-                                                
-                                                
-            //outGx[idxI] = _mm_extract_epi32 (r, 0);
-            xx = _mm_extract_epi32 (r, 0);
-            PRINT_INLINE ("gx:");
-            PRINT_INLINE (xx);
-            
-            //gy
-            inv = _mm_insert_epi32 (inv, gy[idxI], 0);
-            inv = _mm_insert_epi32 (inv, gy[idxI + stride] , 1);
-            inv = _mm_insert_epi32 (inv, gy[idxI + 2 * stride], 2);
-            r =  _mm_cvtps_epi32 (_mm_dp_ps ( _mm_cvtepi32_ps (kvGy), 
-                                              _mm_cvtepi32_ps (inv), 
-                                              241 )); // calculate dot procuct and store in kvGy[0]
-            //outGy[idxI] = _mm_extract_epi32 (r, 0);
-            yy = _mm_extract_epi32 (r, 0);
-            //OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >::OpCannyMagnitudeAndOrientation mo;
-            //mo = 
-            
-            PRINT_INLINE ("gy:");
-            PRINT_INLINE (yy);
-            
-            output[idxI] = *(int*)&GetMagnitudeAndOrientation(xx,yy);
-            
-        }
-    }       
-    
-    delete [] tempGx;
-    delete [] tempGy;
-    
-}
-
-
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-:: ClearBuffer( float* buffer, 
-                int stride, 
-                int height )
-{
-    OutputImagePixelType * start  = buffer;
-    OutputImagePixelType * end = &buffer[stride * height];
-    OutputImagePixelType * p;
-    
-    //openmp is slower than sse only version 
-    //#pragma omp parallel for num_threads(omp_get_num_procs()) shared (start, end) private(p)
-    //for (p = start; p < end; ++p) {
-    //     *p = 0;
-    //}
-    
-    const __m128 value = _mm_set_ps(0.0f, 0.0f, 0.0f, 0.0f);
-    for (p = start; p < end - 32; p += 32) {
-        _mm_stream_ps(p, value);
-        _mm_stream_ps(p + 4, value);
-        _mm_stream_ps(p + 8, value);
-        _mm_stream_ps(p + 12, value);
-        _mm_stream_ps(p + 16, value);
-        _mm_stream_ps(p + 20, value);
-        _mm_stream_ps(p + 24, value);
-        _mm_stream_ps(p + 28, value);
-    }
-    
-    p -= 32;
-
-    // trailing ones
-    while (p < end)
-        *p++ = 0;  
-    
-}
-
 
 template< class TInputImage, class TOutputImage >
 void
@@ -1090,10 +1240,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 :: Multiply( int stride, int height, 
              float* input1, float* input2,  float* output )
 {
-//    cout << "stride " << stride << endl;
     int startY  = 0;
-    int stopY   = height * stride; //shared (input1, input2, output) 
-    //#pragma omp parallel for 
+    int stopY   = height * stride;
     for (int y = startY; y < stopY; y += 4) {
         __m128 inv0 = _mm_load_ps(&input1[y]);   PRINT_VECTOR(inv0);
         __m128 inv1 = _mm_load_ps(&input2[y]);   PRINT_VECTOR(inv1);
@@ -1101,1051 +1249,6 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     }
 }
 
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-:: MaxMin ( const float* buffer, int* max, int* min, int radius )
-{
-
-    typename TInputImage::SizeType regionSize = this->GetInput()->GetRequestedRegion().GetSize();
-    int width = regionSize[0];
-    int height = regionSize[1];    
-
-    *min = std::numeric_limits<int>::max();
-    *max = std::numeric_limits<int>::min();
-
-
-    int stride = CalculateAlignedStride ( width, height );    
-    
-    //openmp is slower than sse only version 
-    //#pragma omp parallel for num_threads(omp_get_num_procs()) shared (start, end) private(p)
-    //for (p = start; p < end; ++p) {
-    //     *p = 0;
-    //}
-    
-    int startX  = 0;
-    int stopX   = width - 2 * radius;
-    int startY  = 0;
-    int stopY   = height - 2 * radius;   
-    int offset = (stride - width + radius * 2);
-    int x = 0;
-    __m128i maxv = _mm_set1_epi32(*max);
-    __m128i minv =  _mm_set1_epi32(*min);
-    //cout << offset << endl;
-    //cout << radius << endl;
-    //cout << width << endl;
-    //cout << stride << endl;
-    for (int y = startY; y < stopY; ++y)
-    {
-        for (x = startX; x < stopX - 4; x += 4, buffer += 4)
-        {    
-            //cout << x << " ";
-            //cout << (((long)buffer % 16) == 0) << " ";
-            __m128i v = _mm_load_si128 ( ( __m128i *) buffer );
-            maxv =  _mm_max_epi32 (maxv, v);
-            minv =  _mm_min_epi32 (minv, v);
-        }
-        // trailing ones
-        while (x++ < stopX) {
-            if ( *buffer > *max ) 
-                *max = *buffer; 
-            if ( *buffer < *min ) 
-                *min = *buffer; 
-            //cout << ((buffer % 16) == 0) << " ";
-            buffer++;     
-        }         
-        buffer += offset;
-    }
-
-    int temp[4] __attribute__ ((aligned(16)));
-    _mm_store_si128 ( (__m128i * ) temp, maxv); // store result in tempv    
-    /*
-    cout << endl;
-    cout << temp[0] << endl;
-    cout << temp[1] << endl;
-    cout << temp[2] << endl;
-    cout << temp[3] << endl;
-    */
-    
-    for (int i = 0; i < 4; ++i) {
-        if ( temp [i] > *max ) 
-            *max = temp [i]; 
-    }    
-    _mm_store_si128 ( (__m128i * ) temp, minv); // store result in tempv    
-    for (int i = 0; i < 4; ++i) {
-        if ( temp [i] < *min ) 
-            *min = temp [i]; 
-    } 
-       
-}
-
-
-template< class TInputImage, class TOutputImage >
-float
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-:: MaxGradient ( const float* gx, const float* gy )
-{
-
-    typename TInputImage::SizeType regionSize = this->GetInput()->GetRequestedRegion().GetSize();
-    int width = regionSize[0];
-    int height = regionSize[1];    
-
-
-    int stride = CalculateAlignedStride ( width, height );    
-    int radius = (m_GaussianKernelWidth / 2) + 1;
-    
-    const float*  gxp = gx;
-    const float*  gyp = gy;
-    
-    //openmp is slower than sse only version 
-    //#pragma omp parallel for num_threads(omp_get_num_procs()) shared (start, end) private(p)
-    //for (p = start; p < end; ++p) {
-    //     *p = 0;
-    //}
-    
-    int startX  = 0;
-    int stopX   = width - 2 * radius;
-    int startY  = 0;
-    int stopY   = height - 2 * radius;   
-    int offset = (stride - width + radius * 2) - 4;
-    
-    __m128i result, abs, gxv, gyv;
-    result = _mm_setzero_si128();
-    abs =  _mm_set1_epi32 (0xFFFFFFFF);
-    float maxGradient = 0;
-    //float g = 0;
-    int x = 0;
-    for (int y = startY; y < stopY; ++y)
-    {
-        for (x = startX; x < stopX - 4; x += 4, gxp += 4, gyp += 4)
-        {    
-            gxv = _mm_loadu_si128 ( ( __m128i *) gxp );
-            gyv = _mm_loadu_si128 ( ( __m128i *) gyp );
-            result =  _mm_max_epi32 (result, 
-                _mm_add_epi32 (  _mm_and_si128 (gxv, abs),  
-                                 _mm_and_si128 (gyv, abs) ));
-        }
-        /*
-        gxp -= 4;
-        gyp -= 4;
-
-        int temp[4] __attribute__ ((aligned(16)));
-        _mm_storeu_si128 ( (__m128i * ) temp, result); // store result in tempv    
-         
-        for (int i = 0; i < 4; ++i) {
-            if ( temp [i] > maxGradient ) 
-                maxGradient = temp [i]; 
-        }
-        // trailing ones
-        while (x++ < stopX) {
-            g = fabs( *gxp++ ) + fabs( *gyp++ );  
-            if ( g > maxGradient ) 
-                maxGradient = g; 
-        }        */
-        gxp += offset;
-        gyp += offset;
-    }
-
-    int temp[4] __attribute__ ((aligned(16)));
-    _mm_storeu_si128 ( (__m128i * ) temp, result); // store result in tempv    
-     
-    for (int i = 0; i < 4; ++i) {
-        if ( temp [i] > maxGradient ) 
-            maxGradient = temp [i]; 
-    }    
-     /*
-    for (gxp = startGx, gyp = startGy; gxp < endGx - 4; gxp += 4, gyp += 4) {
-    
-        gxv = _mm_loadu_ps ( gxp );
-        gyv = _mm_loadu_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        //gxp += offset;
-        //gyp += offset;
-        
-       
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-        
-        cout << *gxp << ", " << *gyp << "; ";
-        
-        gxp += 4; gyp += 4;
-        gxv = _mm_load_ps ( gxp );
-        gyv = _mm_load_ps ( gyp );
-        result = _mm_max_ps(result, _mm_add_ps ( _mm_and_ps (gxv, abs), _mm_and_ps (gyv, abs) ));
-     
-        cout << *gxp << ", " << *gyp << "; ";
-        
-    }
-        */
-    
-   
-    return maxGradient;
-}
-
-template< class TInputImage, class TOutputImage >
-inline void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::VerifyThreshold( float* out, int g, int x, int y ) {
-
-    ListNodeType * node;
-    if (*out != 0) {
-        // check if above or equal to high threshold, if so have an edge
-        if (g > m_UpperThreshold) {
-            *out = 255;
-            node = m_NodeStore->Borrow();
-            IndexType i = {{x, y}};
-            node->m_Value = i;
-            m_NodeList->PushFront(node);
-        }      
-        // check if below low threshold, if so not an edge
-        else if (g <= m_LowerThreshold) {
-              *out = 0;
-        }
-        else {
-            *out = 1;
-        }
-    } 
-}
-
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-:: NonMaximumSuppressionBoundaries(float* output, float* om)
-{
-    PRINT_LABEL ("NonMaximumSuppressionBoundaries");
-    //TODO: usar tangente para o theta
-    //TODO: Empilhar apenas os inteiros, tirar a estrutura.
-    typename TInputImage::SizeType regionSize = 
-        this->GetInput()->GetRequestedRegion().GetSize();
-    int width = regionSize[0];
-    int height = regionSize[1];    
-    
-    //deletar
-    float* gx = om;
-    float* gy = om;
-    
-    float* gxp = gx;
-    float* gyp = gy;
-    float* out = output;
-
-    //TODO: NonMaximaSupression: Do the magnitude and 
-    // orientation calculation in one pass only.
-    int stride = CalculateAlignedStride ( width, height );    
-    int radius = m_GaussianKernelWidth / 2 + 1;
-    
-    //ClearEdges(output, stride, height, 0, 0, radius * 2, radius * 2); 
-
-    float t = 0; //theta
-    
-    // 0 to 22.5 is set to 0 degrees.
-    const float q1 = 0.392699082;   
-    // 22.5 to 67.5 degrees is set to 45 degrees (0.785398163 radians).
-    const float q2 = 1.17809725;    
-    // 67.5 to 112.5 degrees is set to 90 degrees (1.57079633 radians).
-    const float q3 = 1.96349541;    
-    // 112.5 to 157.5 degrees is set to 135 degrees (2.35619449 radians).
-    const float q4 = 2.74889357;    
-    
-    
-    int g;
-    
-    width -= radius * 2;    
-    height -= radius * 2;    
-
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Corner Top-Left");
-    PRINT_INLINE ("\t");    
-    
-    // x . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .        
-    gxp = gx;    
-    gyp = gy;    
-    out = output;    
-    
-    t = arctan2 (*gyp, *gxp);
-    g =  abs(*gxp) + abs(*gyp);  
-    
-    PRINT_INLINE (*gxp);
-    PRINT_INLINE (",");
-    PRINT_INLINE (*gyp);
-    PRINT_INLINE (";");
-    
-    if ( t < q1 ) { // 0 degrees = -
-        *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-    } 
-    else if ( t < q2 ) { // 45 degrees = \ -
-        *out = g > abs(*(gxp + stride + 1)) + abs(*(gyp + stride + 1));
-    }
-    else if ( t < q3) { // 90 degress = |
-        *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-    }
-    else { // 0 degrees = -
-        *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-    }
-
-    VerifyThreshold( out, g, 0, 0 );
-    
-
-     
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Corner Top-Right");
-    PRINT_INLINE ("\t");    
-    // . . . . . . . . . x
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .        
-    gxp = gx + width - 1;
-    gyp = gy + width - 1;
-    out = output + width - 1;  
-    
-    t = arctan2 (*gyp, *gxp);
-    g =  abs(*gxp) + abs(*gyp);  
-    
-    PRINT_INLINE (*gxp);
-    PRINT_INLINE (",");
-    PRINT_INLINE (*gyp);
-    PRINT_INLINE (";");
-    
-    if ( t < q1 ) { // 0 degrees = -
-        *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-    } 
-    else if ( t < q3) { // 90 degress = |
-        *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-    }
-    else if ( t < q4 ) { // 135 degress = /
-        *out = g > abs(*(gxp + stride - 1)) + abs(*(gyp + stride - 1));
-    }            
-    else { // 0 degrees = -
-        *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-    }
-
-    VerifyThreshold( out, g, width - 1, 0 );
-        
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Corner Bottom-Right");
-    PRINT_INLINE ("\t");    
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . x        
-    gxp = gx + stride * (height - 1) + width - 1;
-    gyp = gy + stride * (height - 1) + width - 1;
-    out = output + stride * (height - 1) + width - 1;  
-    
-    t = arctan2 (*gyp, *gxp);
-    g =  abs(*gxp) + abs(*gyp);  
-    
-    PRINT_INLINE (*gxp);
-    PRINT_INLINE (",");
-    PRINT_INLINE (*gyp);
-    PRINT_INLINE (";");
-    
-    if ( t < q1 ) { // 0 degrees = -
-        *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-    } 
-    else if ( t < q3) { // 90 degress = |
-        *out = g > abs(*(gxp - stride)) + abs(*(gyp - stride));
-    }
-    else if ( t < q2 ) { // 45 degrees = \ -
-        *out = g > abs(*(gxp - stride - 1)) + abs(*(gyp - stride - 1));
-    }       
-    else { // 0 degrees = -
-        *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-    }
-
-    VerifyThreshold( out, g, width - 1, height - 1 );
-        
-        
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Corner Bottom-Left");
-    PRINT_INLINE ("\t");    
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // x . . . . . . . . .        
-    gxp = gx + stride * (height - 1);
-    gyp = gy + stride * (height - 1);
-    out = output + stride * (height - 1);  
-    
-    t = arctan2 (*gyp, *gxp);
-    g =  abs(*gxp) + abs(*gyp);  
-    
-    PRINT_INLINE (*gxp);
-    PRINT_INLINE (",");
-    PRINT_INLINE (*gyp);
-    PRINT_INLINE (";");
-    
-    if ( t < q1 ) { // 0 degrees = -
-        *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-    } 
-    else if ( t < q3) { // 90 degress = |
-        *out = g > abs(*(gxp - stride)) + abs(*(gyp - stride));
-    }
-    else if ( t < q4 ) { // 135 degress = /
-        *out = g > abs(*(gxp - stride + 1)) + abs(*(gyp - stride + 1));
-    }            
-    else { // 0 degrees = -
-        *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-    }
-
-    VerifyThreshold( out, g, 0, height - 1 );          
-    
-    gxp = gx + stride;    
-    gyp = gy + stride;    
-    out = output + stride;    
-            
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Left");
-    PRINT_INLINE ("\t");
-    // . . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // x . . . . . . . . .
-    // . . . . . . . . . .    
-    for (int y = 1; y < height - 1; y++) //the corner pixels are not evaluated
-    {
-        t = arctan2 (*gyp, *gxp);
-        g =  abs(*gxp) + abs(*gyp);  
-        
-        PRINT_INLINE (*gxp);
-        PRINT_INLINE (",");
-        PRINT_INLINE (*gyp);
-        PRINT_INLINE (";");
-        
-        if ( t < q1 ) { // 0 degrees = -
-            *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-        } 
-        else if ( t < q2 ) { // 45 degrees = \ -
-            *out = g > abs(*(gxp + stride + 1)) + abs(*(gyp + stride + 1));
-        }
-        else if ( t < q3) { // 90 degress = |
-            *out = g > abs(*(gxp - stride)) + abs(*(gyp - stride));
-            if (*out)
-                *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-        }
-        else if ( t < q4 ) { // 135 degress = /
-            *out = g > abs(*(gxp - stride + 1)) + abs(*(gyp - stride + 1));
-        }            
-        else { // 0 degrees = -
-            *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-        }
-
-        VerifyThreshold( out, g, 0, y );
-
-        out += stride; 
-        gyp += stride; 
-        gxp += stride; 
-    }   
-
-    gxp = gx + width - 1 + stride;
-    gyp = gy + width - 1 + stride;
-    out = output + width - 1 + stride;
-    
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Right");
-    PRINT_INLINE ("\t");
-    // . . . . . . . . . .
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . x
-    // . . . . . . . . . .    
-    for (int y = 1; y < height - 1; y++)
-    {
-        t = arctan2 (*gyp, *gxp);
-        g =  abs(*gxp) + abs(*gyp);  
-        
-        PRINT_INLINE (*gxp);
-        PRINT_INLINE (",");
-        PRINT_INLINE (*gyp);
-        PRINT_INLINE (";");        
-        
-        if ( t < q1 ) { // 0 degrees = -
-            *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-        } 
-        else if ( t < q2 ) { // 45 degrees - \ -
-            *out = g > abs(*(gxp - stride - 1)) + abs(*(gyp - stride - 1));
-        }
-        else if ( t < q3) { // 90 degress - |
-            *out = g > abs(*(gxp - stride)) + abs(*(gyp - stride));
-            if (*out)
-                *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-        }
-        else if ( t < q4 ) { // 135 degress - /
-            *out = g > abs(*(gxp + stride - 1)) + abs(*(gyp + stride - 1));
-        }            
-        else {  // 0 degrees = -
-            *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-        }
-
-        VerifyThreshold( out, g, width - 1, y );
-
-        out += stride; 
-        gyp += stride; 
-        gxp += stride; 
-    }   
-                        
-
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Top");
-    PRINT_INLINE ("\t");
-    gxp = gx + 1;
-    gyp = gy + 1;
-    out = output + 1;
-    // . x x x x x x x x .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .    
-    for (int x = 1; x < width - 1; x++)
-    {
-        t = arctan2 (*gyp, *gxp);
-        g =  abs(*gxp) + abs(*gyp);  
-        
-        PRINT_INLINE (*gxp);
-        PRINT_INLINE (",");
-        PRINT_INLINE (*gyp);
-        PRINT_INLINE (";");               
-        
-        if ( t < q1 ) { // 0 degrees = -
-            *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-            if (*out)
-                *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-        } 
-        else if ( t < q2 ) { // 45 degrees - \ -
-            *out = g > abs(*(gxp + stride + 1)) + abs(*(gyp + stride + 1));
-        }
-        else if ( t < q3) { // 90 degress - |
-            *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-        }
-        else if ( t < q4 ) { // 135 degress - /
-            *out = g > abs(*(gxp + stride - 1)) + abs(*(gyp + stride - 1));
-        }            
-        else { // 0 degrees = -
-            *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-            if (*out)
-                *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-        }
-        
-        VerifyThreshold( out, g, x, 0 );
-
-        out++; 
-        gyp++; 
-        gxp++; 
-    }   
-
-    gxp = gx + (stride * (height - 1)) + 1;
-    gyp = gy + (stride * (height - 1)) + 1;
-    out = output + (stride * (height - 1)) + 1;
-
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Bottom");        
-    PRINT_INLINE ("\t");
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .    
-    // . x x x x x x x x .
-    for (int x = 1; x < width - 1; x++)
-    {
-        t = arctan2 (*gyp, *gxp);
-        g =  abs(*gxp) + abs(*gyp);  
-        
-        PRINT_INLINE (*gxp);
-        PRINT_INLINE (",");
-        PRINT_INLINE (*gyp);
-        PRINT_INLINE (";");             
-        
-        if ( t < q1 ) { // 0 degrees = -
-            *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-            if (*out)
-                *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-        } 
-        else if ( t < q2 ) { // 45 degrees - \ -
-            *out = g > abs(*(gxp + stride + 1)) + abs(*(gyp + stride + 1));
-        }
-        else if ( t < q3) { // 90 degress - |
-            *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-        }
-        else if ( t < q4 ) { // 135 degress - /
-            *out = g > abs(*(gxp - stride + 1)) + abs(*(gyp - stride + 1));
-        }            
-        else { // 0 degrees = -
-            *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-            if (*out)
-                *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-        }
-
-        VerifyThreshold( out, g, x, height - 1 );
-
-        out++; 
-        gyp++; 
-        gxp++; 
-    }   
-}
-
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-:: NonMaximumSuppression(float* output, float* om)
-{
-    PRINT_LABEL ("NonMaximumSuppression");
-    //TODO: usar tangente para o theta
-    //TODO: Empilhar apenas os inteiros, tirar a estrutura.
-    typename TInputImage::SizeType regionSize = 
-        this->GetInput()->GetRequestedRegion().GetSize();
-    int width = regionSize[0];
-    int height = regionSize[1];    
-    
-    //deletar
-    float* gx = om;
-    float* gy = om;
-    
-    float* gxp = gx;
-    float* gyp = gy;
-    float* out = output;
-    
-    NonMaximumSuppressionBoundaries(output, om);
-    
-    //TODO: NonMaximaSupression: Do the magnitude and 
-    // orientation calculation in one pass only.
-    int stride = CalculateAlignedStride ( width, height );    
-    int radius = m_GaussianKernelWidth / 2 + 1;
-    
-    //ClearEdges(output, stride, height, 0, 0, radius * 2, radius * 2); 
-
-    float t = 0; //theta
-    
-    // 0 to 22.5 is set to 0 degrees.
-    const float q1 = 0.392699082;   
-    // 22.5 to 67.5 degrees is set to 45 degrees (0.785398163 radians).
-    const float q2 = 1.17809725;    
-    // 67.5 to 112.5 degrees is set to 90 degrees (1.57079633 radians).
-    const float q3 = 1.96349541;    
-    // 112.5 to 157.5 degrees is set to 135 degrees (2.35619449 radians).
-    const float q4 = 2.74889357;    
-    
-    
-    int g;
-    
-    width -= radius * 2;    
-    height -= radius * 2;    
-
-    int top = 0;
-    int bottom = height - radius * 2;
-    int right = width - radius * 2;
-    int left = 0;
-        
-    gxp = gx + stride + 1;    
-    gyp = gy + stride + 1;    
-    out = output + stride + 1;        
-        
-    top = 1;
-    bottom = height - 1;
-    right = width - 1;
-    left = 1;
-    
-    int startY  = top;
-    int startX  = left;
-    
-    int stopY   = bottom;  
-    int stopX  = right;   
-    
-    int offset = stride - width + 2;    
-    PRINT_INLINE ("\t");
-    PRINT_LABEL ("Middle");        
-    PRINT_INLINE ("\t");
-    
-    // . . . . . . . . . .
-    // . x x x x x x x x .
-    // . x x x x x x x x .
-    // . x x x x x x x x .
-    // . x x x x x x x x .
-    // . x x x x x x x x .
-    // . x x x x x x x x .
-    // . x x x x x x x x .
-    // . x x x x x x x x .    
-    // . . . . . . . . . .    
-    for (int y = startY; y < stopY; y++)
-    {
-        for (int x = startX; x < stopX; x++, out++, gxp++, gyp++)
-        {
-            t = arctan2 (*gyp, *gxp);
-            g =  abs(*gxp) + abs(*gyp);  
-            //cout << *gxp / (fabs(*gyp) + 1e-10) << " ";
-            
-            PRINT_INLINE (*gxp);
-            PRINT_INLINE (",");
-            PRINT_INLINE (*gyp);
-            PRINT_INLINE (";");               
-            //if (t < 0 ) {
-            //    t += M_PI;
-            //}
-           
-            // ## Non-maximum suppression ##
-            // The same binary map shown on the left after non-maxima 
-            // suppression. The edges are still coloured to indicate direction.
-        
-            // Given estimates of the image gradients, a search is then carried 
-            // out to determine if the gradient magnitude assumes a local 
-            // maximum in the gradient direction. So, for example,
-        
-            // if the rounded angle is zero degrees the point will be 
-            // considered to be on the edge if its intensity is greater than 
-            // the intensities in the north and south directions,
-            
-            // if the rounded angle is 45 degrees the point will be considered 
-            // to be on the edge if its intensity is greater than the 
-            // intensities in the north west and south east directions.
-            
-            // if the rounded angle is 90 degrees the point will be considered 
-            // to be on the edge if its intensity is greater than 
-            // the intensities in the west and east directions,
-            
-            // if the rounded angle is 135 degrees the point will be considered 
-            // to be on the edge if its intensity is greater than the 
-            // intensities in the north east and south west directions,
-                       
-
-            if ( t < q1 ) {
-                *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-                if (*out)
-                    *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-            } 
-            else if ( t < q2 ) { // 45 degrees
-                *out = g > abs(*(gxp - stride - 1)) + abs(*(gyp - stride - 1));
-                if (*out)
-                    *out = g > abs(*(gxp + stride + 1)) + abs(*(gyp + stride + 1));
-            }
-            else if ( t < q3) { // 90 degress
-                *out = g > abs(*(gxp - stride)) + abs(*(gyp - stride));
-                if (*out)
-                    *out = g > abs(*(gxp + stride)) + abs(*(gyp + stride));
-            }
-            else if ( t < q4 ) { // 135 degress
-                *out = g > abs(*(gxp - stride + 1)) + abs(*(gyp - stride + 1));
-                if (*out)
-                    *out = g > abs(*(gxp + stride - 1)) + abs(*(gyp + stride - 1));
-            }            
-            else {
-                *out = g > abs(*(gxp - 1)) + abs(*(gyp - 1));
-                if (*out)
-                    *out = g > abs(*(gxp + 1)) + abs(*(gyp + 1));
-            }
-            
-            VerifyThreshold( out, g, x, y );
-            
-        }    
-        out += offset; 
-        gyp += offset; 
-        gxp += offset; 
-    }   
-}
-
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-::HysteresisThresholding( float* input )
-{
-
-    PRINT_LABEL ("HysteresisThresholding");        
-    typename TInputImage::SizeType regionSize = this->GetInput()->GetRequestedRegion().GetSize();
-    int width = regionSize[0];
-    int height = regionSize[1];    
-   
-    int stride = CalculateAlignedStride ( width, height );    
-    
-    OutputImagePixelType *output = this->GetOutput(0)->GetBufferPointer(); //outputBuffer
-    OutputImagePixelType *out = output; //outputBuffer
-    
-    int offset = m_GaussianKernelWidth / 2 + 1;
-
-    //ClearBuffer (out, stride, height);
-    
-    IndexType cIndex;
-    ListNodeType *node;
-    ListNodeType *child_node;
-    int indexIn = 0;
-    int indexOut = 0;
-  
-    //int h = 255;
-
-    float*  north;
-    float* south;
-    float* west;
-    float* east;
-    float* north_east;
-    float* south_east;
-    float* north_west;
-    float* south_west;
-    
-    float* in;
-    
-                
-    while(!m_NodeList->Empty()) {
-    
-        // Pop the front node from the list and read its index value.
-        node = m_NodeList->Front(); // get a pointer to the first node
-        cIndex = node->m_Value;    // read the value of the first node
-        m_NodeList->PopFront();    // unlink the front node
-        m_NodeStore->Return(node); // return the memory for reuse
-        indexIn = cIndex[1] * stride + cIndex[0];
-        indexOut = (cIndex[1] + offset) * stride + (cIndex[0] + offset);
-
-        PRINT (cIndex);
-        
-        out = output + indexOut; //outputBuffer
-        in = input + indexIn;
-
-        *out = *in;
-        
-        north_west = in - stride - 1;
-        north = in - stride;
-        north_east = in - stride + 1;
-        west = in - 1;
-        east = in + 1;
-        south_west = in + stride - 1;
-        south = in + stride;
-        south_east = in + stride + 1;
-        
-        if ( *north_west == 1 ) {
-            *(out - stride - 1) = 255;
-            //*north_west = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0] - 1, cIndex[1] - 1}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-        if ( *north == 1  ) {
-            *(out - stride) = 255;
-            //*north = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0], cIndex[1] - 1}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-        if ( *west == 1 ) {
-            *(out - 1) = 255;
-            //*west = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0] - 1, cIndex[1]}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-        if ( *east == 1 ) {
-            *(out + 1) = 255;
-            //*east = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0] + 1, cIndex[1]}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-        if ( *south_west == 1 ) {
-            *(out - stride - 1) = 255;
-            //*south_west = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0] - 1, cIndex[1] + 1}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-        if ( *south == 1 ) {
-            *(out + stride) = 255;
-            //*south = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0], cIndex[1] + 1}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-        if ( *south_east == 1 ) {
-            *(out + stride + 1) = 255;
-            //*south_east = h;
-            child_node = m_NodeStore->Borrow();
-            IndexType i = {{cIndex[0] + 1, cIndex[1] + 1}};
-            child_node->m_Value = i;
-            m_NodeList->PushFront(child_node);        
-        }                           
-    }
-        
-}
-
-
-template< class TInputImage, class TOutputImage >
-void
-OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-:: ClearEdges( float*  buffer, 
-               int stride, int height,  int top, int left, int bottom, int right )
-{
-
-    //cout << "stride " << stride << endl;
-    //cout << "height " << height << endl;
-    //cout << "top " << top << endl;
-    //cout << "left " << left << endl;
-    //cout << "bottom " << bottom << endl;
-    //cout << "right " << right << endl;
-
-
-    // x x x x x x x x x x
-    // x x x x x x x x x x
-    // x x x x x x x x x x
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    OutputImagePixelType * p = buffer;
-    for (int y = 0; y < top; y++) {
-        for (int x = 0; x < stride; x++, p++) {
-            *p = 0;
-        }
-    }
-
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // . . . . . . . . . .
-    // x x x x x x x x x x
-    // x x x x x x x x x x
-    // x x x x x x x x x x
-    p = buffer;
-    p += (height - bottom) * stride;
-    for (int y = 0; y < bottom; y++) {
-        for (int x = 0; x < stride; x++, p++) {
-            *p = 0;
-        }
-    }
-
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    // x x x . . . . . . .
-    p = buffer;
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < left; x++, p++) {
-            *p = 0;
-        }
-        p += stride - left;
-    }
-
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    // . . . . . . . x x x 
-    p = buffer;
-    p += stride - right;
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < right; x++, p++) {
-            *p = 0;
-        }
-        p += stride - right;
-    }
-    
-}
 
 template <class TInputImage, class TOutputImage>
 void 

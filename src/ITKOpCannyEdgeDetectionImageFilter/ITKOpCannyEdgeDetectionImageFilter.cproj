@@ -19,7 +19,7 @@
     <SourceDirectory>.</SourceDirectory>
     <OutputName>opcanny</OutputName>
     <CompileTarget>Bin</CompileTarget>
-    <Commandlineparameters>test_64x64.png out.png op.png</Commandlineparameters>
+    <Commandlineparameters>-c</Commandlineparameters>
     <Externalconsole>true</Externalconsole>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -62,5 +62,7 @@
   <ItemGroup>
     <None Include="main.cpp" />
     <None Include="opConvolutionFilter.h" />
+    <None Include="util.h" />
+    <None Include="statistics.h" />
   </ItemGroup>
 </Project>
