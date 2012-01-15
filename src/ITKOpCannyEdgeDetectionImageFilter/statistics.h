@@ -1,5 +1,5 @@
 // 
-// statistics.cpp
+// statistics.h
 //  
 // Author:
 //       Tony Alexander Hild <tony_hild@yahoo.com>

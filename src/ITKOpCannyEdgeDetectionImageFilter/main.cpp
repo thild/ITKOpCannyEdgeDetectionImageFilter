@@ -1,51 +1,35 @@
-/*=========================================================================
+// 
+// main.cpp
+//  
+// Author:
+//       Tony Alexander Hild <tony_hild@yahoo.com>
+// 
+// Copyright (c) 2011 
+// 
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+// 
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
 
-  Program:   Insight Segmentation & Registration Toolkit
-  Module:    $RCSfile: Image5.cxx,v $
-  Language:  C++
-  Date:      $Date: 2009-03-17 21:11:41 $
-  Version:   $Revision: 1.16 $
-
-  Copyright (c) Insight Software Consortium. All rights reserved.
-  See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
-
-     This software is distributed WITHOUT ANY WARRANTY; without even 
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
-     PURPOSE.  See the above copyright notices for more information.
-
-=========================================================================*/
 #if defined(_MSC_VER)
 #pragma warning ( disable : 4786 ) 
 #endif  
- 
-// Software Guide : BeginLatex
-//
-// This example illustrates how to import data into the \doxygen{Image}
-// class. This is particularly useful for interfacing with other software
-// systems. Many systems use a contiguous block of memory as a buffer
-// for image pixel data. The current example assumes this is the case and
-// feeds the buffer into an \doxygen{ImportImageFilter}, thereby producing an
-// Image as output.
 
-//
-// For fun we create a synthetic image with a centered sphere in
-// a locally allocated buffer and pass this block of memory to the
-// ImportImageFilter. This example is set up so that on execution, the
-// user must provide the name of an output file as a command-line argument.
-//
-// \index{itk::ImportImageFilter!Instantiation}
-// \index{itk::ImportImageFilter!Header}
-//
-// First, the header file of the ImportImageFilter class must be
-// included.
-//
-// Software Guide : EndLatex 
-
-
-// Software Guide : BeginCodeSnippet
 #include "itkImage.h"
 #include "itkImportImageFilter.h"
-// Software Guide : EndCodeSnippet
 
 #include "itkImageFileWriter.h"                 
 #include "itkImageFileReader.h"
@@ -75,7 +59,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
-
 
 #define foreach BOOST_FOREACH
 
@@ -147,7 +130,6 @@ struct CheckpointStatistics {
     }
     return stat;
   }
-  
   
   private:
   
@@ -316,24 +298,6 @@ int main (int argc, char *argv[])
       optind++;
   }    
 
- 
-// 
-  
-//std::setprecision(4) << std::setiosflags(std::ios::fixed)
-//  if( argc < 3 ) 
-//    {
-//    std::cerr << "Usage: " << std::endl;
-//    std::cerr << argv[0] << " inputImage outputImage opOutputImage [variance upperThreshold lowerThreshold opUpperThreshold opLowerThreshold iterations]" << std::endl;
-//    return EXIT_FAILURE; 
-//    }
-   
-//  std::cout << "Variance = " << variance << std::endl;
-//  std::cout << "UpperThreshold = " << upperThreshold << std::endl;
-//  std::cout << "LowerThreshold = " << lowerThreshold << std::endl;
-//  std::cout << "OpUpperThreshold = " << opUpperThreshold << std::endl;
-//  std::cout << "OpLowerThreshold = " << opLowerThreshold << std::endl;
-//  std::cout << "Iterations = " << iterations << std::endl; 
-
   string line;
   ifstream confFile ("test.cfg");
   map<string,string> config;
@@ -395,7 +359,6 @@ int main (int argc, char *argv[])
   
     if(conformanceTest) {
       cout << "Running conformance test..." << endl;
-//      sleep(10); 
       
       map<string, ConformanceInfo> conformanceInfo;
       
@@ -416,8 +379,6 @@ int main (int argc, char *argv[])
           string nativeFile = p.parent_path().string() + "/result/native/" + p.filename();
           nativeReader->SetFileName(nativeFile);
           
-//          cout << "Comparing " << opFile << " and " << nativeFile << endl;
-    
           opReader->Update();
           nativeReader->Update();
           
@@ -444,8 +405,6 @@ int main (int argc, char *argv[])
           {
             bool equal = opIt.Get() == nativeIt.Get();
             if (!equal) {
-//              cout << opIt.GetIndex() << endl;
-//              cout << (int)opIt.Get() << ", " << (int)nativeIt.Get() << " - " << opIt.GetIndex() << endl;
               ConformanceInfo ci = conformanceInfo[p.filename()];
               if (ci.NotMatchPixels == 0) {
                 ci.Width = regionSize[0];
@@ -475,37 +434,3 @@ int main (int argc, char *argv[])
        
   return EXIT_SUCCESS;	
 }
-
-
-//struct ConformanceInfo {
-//  public:
-//  ConformanceInfo(){}
-//  int Width;
-//  int Height; 
-//  string Image;
-//  int NotMatchPixels;
-//  double GetNotMatchPercentage() {
-//     return (double)NotMatchPixels / (double)(Width * Height);
-//  }
-//};
-
-
-//
-//      CastToRealFilterType::Pointer opToReal = CastToRealFilterType::New();  
-//          opToReal->SetInput( opReader->GetOutput() );
-//          opToReal->Update();
-//          
-//          CastToRealFilterType::Pointer nativeToReal = CastToRealFilterType::New();  
-//          nativeToReal->SetInput( nativeReader->GetOutput() );
-//          nativeToReal->Update();
-//          
-////          writer->SetFileName(p.parent_path().string() + "/result/op-" + p.filename());
-////          writer->SetInput(opReader->GetOutput());
-////          writer->Update();
-////          
-////          writer->SetFileName(p.parent_path().string() + "/result/native-" + p.filename());
-////          writer->SetInput(nativeReader->GetOutput());
-////          writer->Update();
-//          
-//          RealImageType::Pointer opIm = opToReal->GetOutput();
-//          RealImageType::Pointer nativeIm = nativeToReal->GetOutput();
