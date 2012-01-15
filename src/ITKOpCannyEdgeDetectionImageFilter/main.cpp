@@ -145,9 +145,9 @@ struct CheckpointStatistics {
   CheckpointStatistics()  {  }
 };
 
-void TestDataset(string alg, string ds, string spath, int iterations, double variance, double upperThreshold, double lowerThreshold) {
-    std::cout << "Testing " << ds << " dataset..." << std::endl; 
-    fs::path current_dir(spath); 
+void TestDataset(string alg, string datasetsPath, string dataSet, int iterations, double variance, double upperThreshold, double lowerThreshold) {
+    std::cout << "Testing " << dataSet << " dataset..." << std::endl; 
+    fs::path current_dir(datasetsPath + dataSet); 
     vector<Checkpoint> checkpoints;
     int nfiles = 0;
     fs::directory_iterator it(current_dir), eod;
@@ -181,7 +181,7 @@ void TestDataset(string alg, string ds, string spath, int iterations, double var
             ImageToImageFilterTest::Pointer cannyFilter;
             
             if(alg == "OpCannyEdgeDetectionImageFilter") {
-              f = p.parent_path().string() + "/result/op/" + p.filename();
+              f = "results/" + dataSet + "/op/" + p.filename();
               cannyFilter = OpCannyFilter::New();
               OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
@@ -189,7 +189,7 @@ void TestDataset(string alg, string ds, string spath, int iterations, double var
               filter->SetLowerThreshold( lowerThreshold );
             }
             else {
-              f = p.parent_path().string() + "/result/native/" + p.filename();
+              f = "results/" + dataSet + "/native/" + p.filename();
               cannyFilter = CannyFilter::New();
               CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
@@ -241,7 +241,7 @@ void TestDataset(string alg, string ds, string spath, int iterations, double var
     swTotal.Stop(); 
     
     cout << string(77, '-') << endl;
-    cout << left << alg << " - Dataset " << ds << " - " << nfiles << " files - " << iterations << " iterations" << endl; 
+    cout << left << alg << " - Dataset " << dataSet << " - " << nfiles << " files - " << iterations << " iterations" << endl; 
     cout << string(77, '-') << endl;
 
     map<string, StatisticInfo> info = CheckpointStatistics::GetStatistics(checkpoints); 
@@ -317,52 +317,52 @@ int main (int argc, char *argv[])
       cout << "Unable to open test.cfg file" << flush << endl; 
       return 1;
   }
-  
+
+   
   using boost::lexical_cast;
   using boost::bad_lexical_cast;  
-  
-  float variance = lexical_cast<float>(config["variance"]);
-  float upperThreshold = lexical_cast<float>(config["upper_threshold"]);
-  float lowerThreshold = lexical_cast<float>(config["lower_threshold"]); 
-  int iterations = lexical_cast<int>(config["iterations"]);
-  
-  vector<string> dataSets = split(config["ds"], ',');  
-  
-  //for all datasets  
-  for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
-    string spath = config["dsfolder"] +  string("/") + *ds;
+ 
+  if(performanceTest) {
+    fs::path rpath("results");
+    fs::remove_all(rpath);
+    fs::create_directory(rpath);
+   
+    float variance = lexical_cast<float>(config["variance"]);
+    float upperThreshold = lexical_cast<float>(config["upper_threshold"]);
+    float lowerThreshold = lexical_cast<float>(config["lower_threshold"]); 
+    int iterations = lexical_cast<int>(config["iterations"]);
     
-    if(performanceTest) {
-      string s = spath + "/result";
-      fs::path rpath(s);
-      if(!fs::exists(rpath)) 
-          fs::create_directory(rpath);
+    vector<string> dataSets = split(config["ds"], ',');  
+    
+    //for all datasets  
+    for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
       
-      s = s + "/op";
-      rpath = fs::path(s);
-      if(!fs::exists(rpath)) 
-          fs::create_directory(rpath);
+      fs::create_directory(fs::path("results/" + *ds));
+      fs::create_directory(fs::path("results/" + *ds + "/op"));
+      fs::create_directory(fs::path("results/" + *ds));
+      fs::create_directory(fs::path("results/" + *ds + "/native"));
   
-      s = spath + "/result/native";
-      rpath = fs::path(s);
-      if(!fs::exists(rpath)) 
-          fs::create_directory(rpath);
-  
+      string datasetsPath = config["dsfolder"] +  string("/");
        
-      TestDataset("OpCannyEdgeDetectionImageFilter", *ds, spath, iterations, variance, upperThreshold, lowerThreshold);
+      TestDataset("OpCannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, variance, upperThreshold, lowerThreshold);
       cout << endl;
-      TestDataset("CannyEdgeDetectionImageFilter", *ds, spath, iterations, variance, upperThreshold, lowerThreshold);
+      TestDataset("CannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, variance, upperThreshold, lowerThreshold);
       cout << endl;
       cout << endl;
     }
+  }
   
-  
-    if(conformanceTest) {
+  if(conformanceTest) {
+   
+    vector<string> dataSets = split(config["ds"], ',');  
+    //for all datasets  
+    for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
+
       cout << "Running conformance test..." << endl;
       
       map<string, ConformanceInfo> conformanceInfo;
-      
-      fs::path current_dir(spath); 
+
+      fs::path current_dir("results/" + *ds + "/op" ); 
       fs::directory_iterator it(current_dir), eod;
       
       foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
@@ -373,10 +373,10 @@ int main (int argc, char *argv[])
           ReaderType::Pointer opReader = ReaderType::New();
           ReaderType::Pointer nativeReader = ReaderType::New();
           
-          string opFile = p.parent_path().string() + "/result/op/" + p.filename();
+          string opFile = "results/" + *ds + "/op/" + p.filename();
           opReader->SetFileName(opFile);
           
-          string nativeFile = p.parent_path().string() + "/result/native/" + p.filename();
+          string nativeFile = "results/" + *ds + "/native/" + p.filename();
           nativeReader->SetFileName(nativeFile);
           
           opReader->Update();
