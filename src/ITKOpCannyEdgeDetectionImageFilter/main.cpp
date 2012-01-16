@@ -60,11 +60,9 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
-#define BOOST_FILESYSTEM_VERSION 3
 #define foreach BOOST_FOREACH
 
 namespace fs = boost::filesystem;
-
 using std::cout;
 using std::cerr;   
 using std::endl;
@@ -182,7 +180,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
             ImageToImageFilterTest::Pointer cannyFilter;
             
             if(alg == "OpCannyEdgeDetectionImageFilter") {
-              f = "results/" + string(dataSet) + "/op/" + string(p.filename());
+              f = "results/" + string(dataSet) + "/op/" + string(p.filename().string());
               cannyFilter = OpCannyFilter::New();
               OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
@@ -190,7 +188,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
               filter->SetLowerThreshold( lowerThreshold );
             }
             else {
-              f = "results/" + string(dataSet) + "/native/" + string(p.filename());
+              f = "results/" + string(dataSet) + "/native/" + string(p.filename().string());
               cannyFilter = CannyFilter::New();
               CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
@@ -380,10 +378,10 @@ int main (int argc, char *argv[])
           ReaderType::Pointer opReader = ReaderType::New();
           ReaderType::Pointer nativeReader = ReaderType::New();
           
-          string opFile = "results/" + *ds + "/op/" + p.filename();
+          string opFile = "results/" + *ds + "/op/" + p.filename().string();
           opReader->SetFileName(opFile);
           
-          string nativeFile = "results/" + *ds + "/native/" + p.filename();
+          string nativeFile = "results/" + *ds + "/native/" + p.filename().string();
           nativeReader->SetFileName(nativeFile);
           
           opReader->Update();
@@ -412,14 +410,14 @@ int main (int argc, char *argv[])
           {
             bool equal = opIt.Get() == nativeIt.Get();
             if (!equal) {
-              ConformanceInfo ci = conformanceInfo[p.filename()];
+              ConformanceInfo ci = conformanceInfo[p.filename().string()];
               if (ci.NotMatchPixels == 0) {
                 ci.Width = regionSize[0];
                 ci.Height = regionSize[1];
                 ci.Image = p.filename();
               }
               ci.NotMatchPixels++;
-              conformanceInfo[p.filename()] = ci;
+              conformanceInfo[p.filename().string()] = ci;
             }
             ++opIt;
             ++nativeIt;
