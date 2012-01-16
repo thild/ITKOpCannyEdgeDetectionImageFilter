@@ -414,7 +414,7 @@ int main (int argc, char *argv[])
               if (ci.NotMatchPixels == 0) {
                 ci.Width = regionSize[0];
                 ci.Height = regionSize[1];
-                ci.Image = p.filename();
+                ci.Image = p.filename().string();
               }
               ci.NotMatchPixels++;  
               conformanceInfo[p.filename().string()] = ci;
