@@ -34,7 +34,10 @@
 #include "opConvolutionFilter.h"
 
 #include <omp.h>
-#include <smmintrin.h>
+#ifdef __SSE4_1__
+#include <smmintrin.h>  
+#endif 
+
 #include <emmintrin.h>
 #include <xmmintrin.h>
 

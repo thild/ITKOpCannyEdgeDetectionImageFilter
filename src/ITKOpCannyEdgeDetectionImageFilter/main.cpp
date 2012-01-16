@@ -286,20 +286,26 @@ int main (int argc, char *argv[])
  bool performanceTest = false;
  
   int optind=1;
+  
+  string configFile = "test.cfg";
+  
   // decode arguments
   while ((optind < argc) && (argv[optind][0]=='-')) {
       string sw = argv[optind];
       if (sw=="-c") {
+          configFile = argv[optind + 1];
+      }
+      else if (sw=="-ct") {
           conformanceTest = true; 
       }
-      else if (sw=="-p") {
+      else if (sw=="-pt") {
           performanceTest = true; 
       }
       optind++;
   }    
 
   string line;
-  ifstream confFile ("test.cfg");
+  ifstream confFile (configFile.c_str());
   map<string,string> config;
   
   if (confFile.is_open()) {
@@ -324,7 +330,7 @@ int main (int argc, char *argv[])
  
   if(performanceTest) {
     fs::path rpath("results");
-    fs::remove_all(rpath);
+//    fs::remove_all(rpath);
     fs::create_directory(rpath);
    
     float variance = lexical_cast<float>(config["variance"]);

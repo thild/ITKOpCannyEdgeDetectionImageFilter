@@ -1,0 +1,892 @@
+diff -uNr InsightToolkit-3.16.0-Original/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx InsightToolkit-3.16.0-Op/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx
+--- InsightToolkit-3.16.0-Original/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2009-08-17 09:01:33.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2012-01-16 05:08:13.010463829 -0200
+@@ -23,6 +23,7 @@
+ #include "itkNumericTraits.h"
+ #include "itkProgressReporter.h"
+ #include "itkGradientMagnitudeImageFilter.h"
++#include "itkStopWatch.h"
+ 
+ namespace itk
+ {
+@@ -335,15 +336,24 @@
+   m_GaussianFilter->SetInput(input);
+   // modify to force excution, due to grafting complications
+   m_GaussianFilter->Modified(); 
++  
++  StopWatch* sw = StopWatchPool::GetStopWatch("CannyEdgeDetectionImageFilter"); 
++  sw->StartNew();
++  sw->AddCheckpoint("Begin GaussianBlur", true);  
+   m_GaussianFilter->Update();
++  sw->AddCheckpoint("GaussianBlur");  
+ 
+   //2. Calculate 2nd order directional derivative-------
+   // Calculate the 2nd order directional derivative of the smoothed image.
+   // The output of this filter will be used to store the directional
+   // derivative.
++  sw->AddCheckpoint("Begin Compute2ndDerivative", true);  
+   this->Compute2ndDerivative();
+-
++  sw->AddCheckpoint("Compute2ndDerivative");  
++  
++  sw->AddCheckpoint("Begin Compute2ndDerivativePos", true);  
+   this->Compute2ndDerivativePos();
++  sw->AddCheckpoint("Compute2ndDerivativePos");  
+ 
+ 
+   // 3. Non-maximum suppression----------
+@@ -351,7 +361,9 @@
+   // Calculate the zero crossings of the 2nd directional derivative and write 
+   // the result to output buffer. 
+   zeroCrossFilter->SetInput(this->GetOutput());
++  sw->AddCheckpoint("Begin ZeroCrossing", true);  
+   zeroCrossFilter->Update();
++  sw->AddCheckpoint("ZeroCrossing");  
+   
+   // 4. Hysteresis Thresholding---------
+ 
+@@ -362,10 +374,16 @@
+   // To save memory, we will graft the output of the m_GaussianFilter, 
+   // which is no longer needed, into the m_MultiplyImageFilter.
+   m_MultiplyImageFilter->GraftOutput( m_GaussianFilter->GetOutput() );
++  sw->AddCheckpoint("Begin Multiply", true);  
+   m_MultiplyImageFilter->Update();
++  sw->AddCheckpoint("Multiply");  
+ 
+   //Then do the double threshoulding upon the edge reponses
++  sw->AddCheckpoint("Begin HysteresisThresholding", true);  
+   this->HysteresisThresholding();
++  sw->AddCheckpoint("HysteresisThresholding");  
++  
++  sw->Stop();
+ }
+ 
+ template< class TInputImage, class TOutputImage >
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/CMakeLists.txt InsightToolkit-3.16.0-Op/Code//Common/CMakeLists.txt
+--- InsightToolkit-3.16.0-Original/Code//Common/CMakeLists.txt	2009-02-11 21:13:55.000000000 -0200
++++ InsightToolkit-3.16.0-Op/Code//Common/CMakeLists.txt	2012-01-16 05:08:13.132458562 -0200
+@@ -1,5 +1,7 @@
+ # Sources of non-templated classes.
+ SET(ITKCommon_SRCS
++  itkAlignedBuffer.cxx      
++  itkStopWatch.cxx
+   itkBarrier.cxx
+   itkBloxItem.cxx
+   itkChainCodePath2D.cxx
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.cxx InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.cxx
+--- InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.cxx	1969-12-31 21:00:00.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.cxx	2012-01-16 05:08:13.161457305 -0200
+@@ -0,0 +1,86 @@
++#include "itkAlignedBuffer.h"
++
++namespace itk
++{
++
++AlignedBuffer::AlignedBuffer()
++{
++}
++
++AlignedBuffer::~AlignedBuffer()
++{
++}
++
++int
++AlignedBuffer::CalculateAlignedStride (int width, int pixelSize)
++{
++   int wBytes = width * pixelSize;
++   return wBytes % ALIGMENT_BYTES == 0 ? width : (wBytes + ALIGMENT_BYTES - (wBytes % ALIGMENT_BYTES)) / pixelSize;
++}
++
++void
++AlignedBuffer::ConvertAlignedToUnalignedBuffer (const uint width, const uint height, const uint stride, 
++                                                const float* input, float *output)
++{
++#ifdef __SSE3__
++    for (uint y = 0; y < height; ++y) {
++        uint x = 0;
++        for (; x < width - 32;  /* loop unrolled */) {
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++            _mm_stream_ps(&output[y * width + x], _mm_load_ps(&input[y * stride + x])); x += 4;
++        }
++        x -= 31;
++        for (; x < width; ++x) {
++            output[y * width + x] = input[y * stride + x];
++        }
++    }   
++#else
++    for (uint y = 0; y < height; ++y) 
++    {
++        for (uint x = 0; x < width - 32; /* loop unrolled */ ) 
++        {
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++            output[y * width + x] = input[y * stride + x]; ++x;
++        }
++    }   
++#endif
++}
++
++} //namespace ITK
++
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.h InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.h
+--- InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.h	1969-12-31 21:00:00.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.h	2012-01-16 05:08:13.162457265 -0200
+@@ -0,0 +1,63 @@
++#ifndef __itkAlignedBuffer_h
++#define __itkAlignedBuffer_h
++
++#include "itkObject.h"
++#include "itkObjectFactory.h"
++
++#define ALIGMENT_BYTES 64 
++
++namespace itk
++{
++ 
++/** TODO 
++ *  Convert this class to templates to handle other images types and dimensions
++ 
++template <typename T>
++void
++ConvertAlignedToUnalignedBuffer (const uint pixelSize, const uint componentSize, 
++                                 const uint width, const uint height, const uint stride, 
++                                 const T* inputBuffer, T* outputBuffer);
++
++uint CalculateAlignedStride (uint width, uint pixelSize); 
++ 
++ */ 
++ 
++/** \class AlignedBuffer
++ * \brief Utilities methods for aligned buffer.
++ */
++class ITKCommon_EXPORT AlignedBuffer : public Object 
++{
++public:
++  /** Standard class typedefs. */
++  typedef AlignedBuffer                   Self;
++  typedef Object                    Superclass;
++  typedef SmartPointer<Self>        Pointer;
++  typedef SmartPointer<const Self>  ConstPointer;
++  
++  /** Method for creation through the object factory. */
++  itkNewMacro(Self);  
++
++  /** Standard part of every itk Object. */
++  itkTypeMacro(AlignedBuffer,Object);
++
++  /** Return the aligned buffer stride.*/
++  static int CalculateAlignedStride (int width, int pixelSize);
++  
++  static void
++  ConvertAlignedToUnalignedBuffer (const uint width, const uint height, const uint stride, 
++                                                const float* input, float *output);
++  
++    
++protected:
++  AlignedBuffer();
++  ~AlignedBuffer();
++
++private:
++  AlignedBuffer(const Self&); //purposely not implemented
++  void operator=(const Self&); //purposely not implemented
++
++};
++
++} // end namespace itk
++
++#endif 
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkConstNeighborhoodIterator.txx InsightToolkit-3.16.0-Op/Code//Common/itkConstNeighborhoodIterator.txx
+--- InsightToolkit-3.16.0-Original/Code//Common/itkConstNeighborhoodIterator.txx	2006-08-02 08:48:41.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkConstNeighborhoodIterator.txx	2012-01-16 05:08:13.192455968 -0200
+@@ -557,6 +557,8 @@
+   const OffsetValueType *offset   = m_ConstImage->GetOffsetTable();
+   const IndexType imageBRStart  = m_ConstImage->GetBufferedRegion().GetIndex();
+   SizeType imageBRSize = m_ConstImage->GetBufferedRegion().GetSize();
++  SizeType wrapBRSize = m_ConstImage->GetBufferedRegion().GetSize();
++  wrapBRSize[0] = m_ConstImage->GetOffsetTable()[1];
+ 
+   // Set the bounds and the wrapping offsets. Inner bounds are the loop
+   // indicies where the iterator will begin to overlap the edge of the image
+@@ -568,7 +570,7 @@
+                 + ( imageBRSize[i]) - static_cast<SizeValueType>(radius[i]) );
+     m_InnerBoundsLow[i] = static_cast<IndexValueType>(imageBRStart[i] 
+                                                                    + radius[i]);
+-    m_WrapOffset[i]     = (static_cast<OffsetValueType>(imageBRSize[i]) 
++    m_WrapOffset[i]     = (static_cast<OffsetValueType>(wrapBRSize[i]) 
+                                 - ( m_Bound[i] - m_BeginIndex[i] )) * offset[i];
+     }
+   m_WrapOffset[Dimension-1] = 0; // last offset is zero because there are no
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImageBase.h InsightToolkit-3.16.0-Op/Code//Common/itkImageBase.h
+--- InsightToolkit-3.16.0-Original/Code//Common/itkImageBase.h	2009-07-12 07:52:52.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkImageBase.h	2012-01-16 05:08:13.096460119 -0200
+@@ -611,7 +611,7 @@
+    * along a row, column, slice, volume, etc. These offsets are based
+    * on the size of the BufferedRegion. This should be called after
+    * the BufferedRegion is set. */
+-  void ComputeOffsetTable();
++  virtual void ComputeOffsetTable();
+ 
+   /** Compute helper matrices used to transform Index coordinates to
+    * PhysicalPoint coordinates and back. This method is virtual and will be
+@@ -638,13 +638,13 @@
+    *  called by ReleaseData and can not modify the MTime 
+    * \sa  ReleaseData, Initialize, SetBufferedRegion */
+   virtual void InitializeBufferedRegion(void);
++  
++  OffsetValueType  m_OffsetTable[VImageDimension+1];
+ 
+ private:
+   ImageBase(const Self&); //purposely not implemented
+   void operator=(const Self&); //purposely not implemented
+ 
+-  OffsetValueType  m_OffsetTable[VImageDimension+1];
+-
+   RegionType          m_LargestPossibleRegion;
+   RegionType          m_RequestedRegion;
+   RegionType          m_BufferedRegion;
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImage.h InsightToolkit-3.16.0-Op/Code//Common/itkImage.h
+--- InsightToolkit-3.16.0-Original/Code//Common/itkImage.h	2009-08-14 10:28:21.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkImage.h	2012-01-16 05:08:13.070461245 -0200
+@@ -26,6 +26,7 @@
+ #include "itkFixedArray.h"
+ #include "itkWeakPointer.h"
+ #include "itkNeighborhoodAccessorFunctor.h"
++#include "itkAlignedBuffer.h"
+ 
+ namespace itk
+ {
+@@ -286,6 +287,12 @@
+   void PrintSelf(std::ostream& os, Indent indent) const;
+   virtual ~Image() {};
+ 
++  /** Calculate the offsets needed to move from one pixel to the next
++   * along a row, column, slice, volume, etc. These offsets are based
++   * on the size of the BufferedRegion. This should be called after
++   * the BufferedRegion is set. */
++  virtual void ComputeOffsetTable();
++  
+   /** Compute helper matrices used to transform Index coordinates to
+    * PhysicalPoint coordinates and back. This method is virtual and will be
+    * overloaded in derived classes in order to provide backward compatibility
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImage.txx InsightToolkit-3.16.0-Op/Code//Common/itkImage.txx
+--- InsightToolkit-3.16.0-Original/Code//Common/itkImage.txx	2009-08-14 08:40:36.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkImage.txx	2012-01-16 05:08:13.082460724 -0200
+@@ -175,6 +175,36 @@
+ #endif
+ }
+ 
++//----------------------------------------------------------------------------
++template<class TPixel, unsigned int VImageDimension>
++void 
++Image<TPixel, VImageDimension>
++::ComputeOffsetTable()
++{
++  // vxl_uint_64 num=1;
++  OffsetValueType num=1;
++  const SizeType& bufferSize = this->GetBufferedRegion().GetSize();
++
++  // m_OffsetTable[0] = (OffsetValueType)num;
++  this->m_OffsetTable[0] = num;
++  for (unsigned int i=0; i < VImageDimension; i++)
++    {
++      if (i == 0)
++        {
++         num *= AlignedBuffer::CalculateAlignedStride(bufferSize[i], sizeof(PixelType));
++         //num *= bufferSize[i];
++          this->m_OffsetTable[i+1] = num;
++          //std::cout << this->m_OffsetTable[i+1] << std::endl;
++        }
++      else 
++       {
++         num *= bufferSize[i];
++         // m_OffsetTable[i+1] = (OffsetValueType)num;
++          //std::cout << num << std::endl;
++         this->m_OffsetTable[i+1] = num;
++       }
++    }
++}
+ 
+ /**
+  *
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.cxx InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.cxx
+--- InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.cxx	1969-12-31 21:00:00.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.cxx	2012-01-16 05:08:13.177456616 -0200
+@@ -0,0 +1,195 @@
++// 
++// StopWatch.cxx
++//  
++// Author:
++//       Tony Alexander Hild <tony_hild@yahoo.com>
++// 
++// Copyright (c) 2011 
++// 
++// Permission is hereby granted, free of charge, to any person obtaining a copy
++// of this software and associated documentation files (the "Software"), to deal
++// in the Software without restriction, including without limitation the rights
++// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++// copies of the Software, and to permit persons to whom the Software is
++// furnished to do so, subject to the following conditions:
++// 
++// The above copyright notice and this permission notice shall be included in
++// all copies or substantial portions of the Software.
++// 
++// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++// THE SOFTWARE.
++
++#include "itkStopWatch.h"
++
++#ifdef _WIN32
++#include <windows.h>
++#else
++#include <sys/time.h>
++#endif
++
++#include <ctime>
++#include <iostream>
++#include <iomanip>
++#include <sstream>
++#include <string>
++#include <vector>
++
++
++StopWatch::StopWatch() : _running(false), _cycles(0), _start(0)
++{
++
++#ifdef _WIN32
++
++    QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
++
++#else
++    _frequency = 1000;
++#endif
++
++}
++
++StopWatch::~StopWatch()
++{
++    // EMPTY!
++}
++
++void
++StopWatch::Start(void)
++{
++    // Return immediately if the timer is already _running
++    if (_running) return;
++    _running = true;
++    _start = Now();
++
++}
++
++void
++StopWatch::StartNew(void)
++{
++    Reset();
++    Start();
++}
++
++i64 StopWatch::Now(void) {
++    i64 n;
++    #ifdef _WIN32
++        QueryPerformanceCounter((LARGE_INTEGER *)&n);
++    #else
++        struct timeval s;
++        gettimeofday(&s, 0);
++        n = (i64)s.tv_sec * 1000 + (i64)s.tv_usec / 1000;
++    #endif
++    return n;
++}
++
++void
++StopWatch::Stop(void)
++{
++    if(!_running) return;
++    _running = false;
++    i64 n = Now();
++    n -= _start;
++    _cycles += n;
++    _start = 0;
++}
++
++void
++StopWatch::AddCheckpoint(const string tag)
++{
++    AddCheckpoint(tag, false);
++}
++
++void
++StopWatch::AddCheckpoint(const string tag, const bool ignore)
++{
++    double instant = GetElapsedTime();
++    double elapsed = 0;
++    if(_checkpoints.size() > 0)
++        elapsed = instant - _checkpoints[_checkpoints.size() - 1].Instant;
++    _checkpoints.push_back(Checkpoint(tag, instant, elapsed, ignore));
++}
++
++//returns only not ignored
++double StopWatch::GetTotalCheckpointsTime() {
++    double total = 0;
++    for (vector<Checkpoint>::iterator it = _checkpoints.begin(); it != _checkpoints.end(); it++ ) { 
++        if(!it->Ignore) {
++            total += it->Elapsed;
++        }
++    }
++    return total;
++}
++
++//returns only not ignored
++vector<Checkpoint> StopWatch::GetNotIgnoredCheckpoints() {
++    vector<Checkpoint> v;
++    for (vector<Checkpoint>::iterator it = _checkpoints.begin(); it != _checkpoints.end(); it++ ) { 
++        if(!it->Ignore) {
++            v.push_back(*it);
++        }
++    }
++    return v;
++}
++
++
++void
++StopWatch::Reset(void)
++{
++    _running = false;
++    _cycles = 0;
++    _start = 0;
++    _checkpoints.clear();
++}
++
++double
++StopWatch::GetElapsedTime(void)
++{
++    if (_running) {
++        i64 n = Now();
++        n -= _start;
++        return (double)(_cycles + n) / (double)_frequency;
++    }
++    return (double)_cycles / (double)_frequency;
++}
++
++
++
++inline std::string StopWatch::ToString()
++{
++  std::ostringstream os;
++  os << "Elapsed time [" << std::setiosflags(std::ios::fixed)
++            << std::setprecision(2)
++            << this->GetElapsedTime() << "] seconds\n";
++  return  os.str();
++
++}
++
++inline std::ostream& operator<<(std::ostream& os, StopWatch& t)
++{
++  os << std::setprecision(4) << std::setiosflags(std::ios::fixed)
++    << t.GetElapsedTime();
++  return os;
++}
++
++
++vector<Checkpoint>& StopWatch::GetCheckpoints()
++{
++  return _checkpoints;
++}
++
++inline std::ostream& operator<<(std::ostream& os, Checkpoint& t)
++{
++  os <<  std::setprecision(4) << std::setiosflags(std::ios::fixed)
++    << "Tag: " << t.Tag << "; Instant: " << t.Instant  << "; Elapsed: " << t.Elapsed;
++  return os;
++}
++
++StopWatch* StopWatchPool::GetStopWatch(const string tag) {
++    static map<string, StopWatch> instances;
++    return &instances[tag];
++}
+diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.h InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.h
+--- InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.h	1969-12-31 21:00:00.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.h	2012-01-16 05:08:13.182456401 -0200
+@@ -0,0 +1,172 @@
++// 
++// StopWatch.h
++//  
++// Author:
++//       Tony Alexander Hild <tony_hild@yahoo.com>
++// 
++// Copyright (c) 2011 
++// 
++// Permission is hereby granted, free of charge, to any person obtaining a copy
++// of this software and associated documentation files (the "Software"), to deal
++// in the Software without restriction, including without limitation the rights
++// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++// copies of the Software, and to permit persons to whom the Software is
++// furnished to do so, subject to the following conditions:
++// 
++// The above copyright notice and this permission notice shall be included in
++// all copies or substantial portions of the Software.
++// 
++// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
++// THE SOFTWARE.
++
++#ifndef _STOPWATCH_H_
++#define _STOPWATCH_H_
++/**
++ * \file StopWatch.h
++ * \brief Class for measuring time.
++ */
++#ifdef _WIN32
++/**
++ * \typedef __int64 i64
++ * \brief Maps the windows 64 bit integer to a uniform name
++ */
++typedef __int64 i64 ;
++#else
++/**
++ * \typedef long long i64
++ * \brief Maps the linux 64 bit integer to a uniform name
++ */
++typedef long long i64;
++#endif
++
++#include <iostream>
++#include <vector>
++#include <map>
++
++using namespace std;
++
++class Checkpoint 
++{
++  public:
++    string Tag;
++    double Instant;
++    double Elapsed;
++    bool Ignore;
++    Checkpoint(string tag, double instant, double elapsed, bool ignore) {
++      this->Tag = tag;
++      this->Instant = instant;
++      this->Elapsed = elapsed;
++      this->Ignore = ignore;
++    }
++};
++
++
++/**
++ * \class StopWatch
++ * \brief Counter that provides a fairly accurate timing mechanism for both
++ * windows and linux. This timer is used extensively in all the samples.
++ */
++class StopWatch {
++
++public:
++    /**
++     * \fn StopWatch()
++     * \brief Constructor for StopWatch that initializes the class
++     */
++    StopWatch();
++    /**
++     * \fn ~StopWatch()
++     * \brief Destructor for StopWatch that cleans up the class
++     */
++    ~StopWatch();
++    
++    /**
++     * \fn void Start(void)
++     * \brief Start the timer
++     * \sa Stop(), Reset()
++     */
++    void Start(void);
++    void StartNew(void);
++    /**
++     * \fn void Stop(void)
++     * \brief Stop the timer
++     * \sa Start(), Reset()
++     */
++    void Stop(void);
++    /**
++     * \fn void AddCheckpoint(const string tag)
++     * \brief Add a checkpoint
++     */
++    void AddCheckpoint(const string tag);
++    void AddCheckpoint(const string tag, const bool ignore);
++    
++    double GetTotalCheckpointsTime();
++    
++    /**
++     * \fn void Reset(void)
++     * \brief Reset the timer to 0
++     * \sa Start(), Stop()
++     */
++    void Reset(void);
++    /**
++     * \fn double GetElapsedTime(void)
++     * \return Amount of time that has accumulated between the \a Start()
++     * and \a Stop() function calls
++     */
++    double GetElapsedTime(void);
++    
++    vector<Checkpoint>& GetCheckpoints();
++    vector<Checkpoint> GetNotIgnoredCheckpoints();
++    
++    std::string ToString();
++    
++  private:
++
++    /**
++     * \fn i64 Now(void)
++     * \brief Return now time
++     */
++    i64 Now(void);
++    
++    bool _running;
++    i64 _frequency;
++    i64 _cycles;
++    i64 _start;
++    vector<Checkpoint> _checkpoints;
++};
++
++
++class StopWatchPool {
++public:
++    static StopWatch* GetStopWatch(const string tag);
++    StopWatchPool();
++    ~StopWatchPool();
++  private:
++};
++
++template <class T>
++class Singleton
++{
++public:
++  static T* Instance() {
++      if(!m_pInstance) m_pInstance = new T;
++      assert(m_pInstance !=NULL);
++      return m_pInstance;
++  }
++protected:
++  Singleton();
++  ~Singleton();
++private:
++  Singleton(Singleton const&);
++  Singleton& operator=(Singleton const&);
++  static T* m_pInstance;
++};
++
++template <class T> T* Singleton<T>::m_pInstance=NULL;
++
++#endif // _STOPWATCH_H_
+diff -uNr InsightToolkit-3.16.0-Original/Code//IO/itkImageFileReader.txx InsightToolkit-3.16.0-Op/Code//IO/itkImageFileReader.txx
+--- InsightToolkit-3.16.0-Original/Code//IO/itkImageFileReader.txx	2009-08-11 09:45:07.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//IO/itkImageFileReader.txx	2012-01-16 05:08:13.244453720 -0200
+@@ -24,6 +24,8 @@
+ #include "itkImageRegion.h"
+ #include "itkPixelTraits.h"
+ #include "itkVectorImage.h"
++#include "itkStopWatch.h"
++#include "itkAlignedBuffer.h"
+ 
+ #include <itksys/SystemTools.hxx>
+ #include <fstream>
+@@ -418,14 +420,15 @@
+       // for the number of pixels read and the number of pixels
+       // requested to not match, the dimensions of the two regions may
+       // be different, therefore we buffer and copy the pixels
+-
+-      itkDebugMacro(<< "Buffer required because file dimension is greater then image dimension");
++      //FIXME Correct buffer alignment  
++      itkDebugMacro(<< "Buffer required because file dimension is greater then image dimension. *FIXME The buffer alignment was not corrected.");
+       
+       OutputImagePixelType *outputBuffer = output->GetPixelContainer()->GetBufferPointer();
+       
+       loadBuffer = new char[ sizeOfActualIORegion ];
+       m_ImageIO->Read( static_cast< void *>(loadBuffer) );
+       
++      
+       // we use std::copy here as it should be optimized to memcpy for
+       // plain old data, but still is oop
+       std::copy( reinterpret_cast<const OutputImagePixelType *>(loadBuffer),
+@@ -434,10 +437,33 @@
+       }
+     else 
+       {
+-      itkDebugMacro(<< "No buffer conversion required.");
++      itkDebugMacro(<< "Buffer conversion required for correct buffer stride alignment.");
+ 
+       OutputImagePixelType *outputBuffer = output->GetPixelContainer()->GetBufferPointer();
+-      m_ImageIO->Read(outputBuffer);
++      
++      size_t stride = AlignedBuffer::CalculateAlignedStride(m_ImageIO->GetDimensions(0), sizeof(OutputImagePixelType)); 
++      size_t width = m_ImageIO->GetDimensions(0); 
++      size_t height = m_ImageIO->GetDimensions(1);
++        
++      StopWatch* sw = StopWatchPool::GetStopWatch("ImageFileReader"); 
++      sw->StartNew();
++      OutputImagePixelType *outputData = new OutputImagePixelType[width * height];
++      sw->Stop();
++      
++      m_ImageIO->Read(outputData);
++      
++      sw->Start();
++      for (uint y = 0; y < height; ++y) 
++        {
++        for (uint x = 0; x < width; ++x) 
++          {
++          outputBuffer[y * stride + x] = outputData[y * width + x];
++          }
++        }   
++        
++      delete [] outputData;          
++      sw->Stop();
++      
+       }
+ 
+     }
+@@ -472,9 +498,14 @@
+ ::DoConvertBuffer(void* inputData,
+                   size_t numberOfPixels)
+ {
+-  // get the pointer to the destination buffer
+-  OutputImagePixelType *outputData =
+-    this->GetOutput()->GetPixelContainer()->GetBufferPointer();
++    size_t stride = AlignedBuffer::CalculateAlignedStride(m_ImageIO->GetDimensions(0), sizeof(OutputImagePixelType)); 
++    size_t width = m_ImageIO->GetDimensions(0); 
++    size_t height = m_ImageIO->GetDimensions(1);
++    
++    StopWatch* sw = StopWatchPool::GetStopWatch("ImageFileReader"); 
++    sw->StartNew();
++    OutputImagePixelType *outputData = new OutputImagePixelType[width * height];
++    sw->Stop();
+ 
+ 
+   // TODO:
+@@ -560,6 +591,19 @@
+     throw e;
+     return;
+     }
++  sw->Start();
++  OutputImagePixelType *output =
++  this->GetOutput()->GetPixelContainer()->GetBufferPointer();
++  for (uint y = 0; y < height; ++y) 
++    {
++    for (uint x = 0; x < width; ++x) 
++      {
++      output[y * stride + x] = outputData[y * width + x];
++      }
++    }   
++  delete [] outputData;    
++  sw->Stop();
++  
+ #undef ITK_CONVERT_BUFFER_IF_BLOCK
+ }
+ 
+@@ -567,3 +611,17 @@
+ } //namespace ITK
+ 
+ #endif
++
++
++//// get the pointer to the destination buffer
++//    OutputImagePixelType *output =
++//        this->GetOutput()->GetPixelContainer()->GetBufferPointer();
++//    
++//    
++//    for (int y = 0; y < height; ++y) {
++//        for (int x = 0; x < width; ++x) {
++//            output[y * stride + x] = outputData[y * width + x];
++//        }
++//    }   
++//    
++//    delete [] outputData;
+diff -uNr InsightToolkit-3.16.0-Original/Code//IO/itkImageFileWriter.txx InsightToolkit-3.16.0-Op/Code//IO/itkImageFileWriter.txx
+--- InsightToolkit-3.16.0-Original/Code//IO/itkImageFileWriter.txx	2009-08-24 15:08:39.000000000 -0300
++++ InsightToolkit-3.16.0-Op/Code//IO/itkImageFileWriter.txx	2012-01-16 05:08:13.259453070 -0200
+@@ -26,6 +26,8 @@
+ #include "itkVectorImage.h"
+ #include "itkImageRegionConstIterator.h"
+ #include "itkImageRegionIterator.h"
++#include "itkStopWatch.h"
++#include "itkAlignedBuffer.h"
+ 
+ namespace itk
+ {
+@@ -415,9 +417,35 @@
+     }
+   } 
+ 
+-
++  StopWatch* sw = StopWatchPool::GetStopWatch("ImageFileWriter"); 
++  sw->StartNew();
++  size_t stride = AlignedBuffer::CalculateAlignedStride(m_ImageIO->GetDimensions(0), sizeof(InputImagePixelType)); 
++  size_t width = m_ImageIO->GetDimensions(0); 
++  size_t height = m_ImageIO->GetDimensions(1);
++
++  InputImagePixelType* outputData = new InputImagePixelType[width * height];
++  
++//  //TODO Only floats for now. Create templates to handles other types of images. See itkAligendBuffer.h
++//  AlignedBuffer::ConvertAlignedToUnalignedBuffer (width, height, stride, 
++//                                                  (float*)dataPtr, (float*)outputData);
++                                                  
++    
++  for (uint y = 0; y < height; ++y) 
++    {
++    for (uint x = 0; x < width; ++x) 
++      {
++      outputData[y * width + x] = ((InputImagePixelType*)dataPtr)[y * stride + x];
++      }
++    }   
++    
++  sw->Stop();
++  dataPtr = (const void*)outputData;
++    
+   m_ImageIO->Write(dataPtr);
+-
++    
++  sw->Start();
++  delete [] outputData;
++  sw->Stop();
+ }
+ 
+ 
