@@ -416,7 +416,7 @@ int main (int argc, char *argv[])
                 ci.Height = regionSize[1];
                 ci.Image = p.filename();
               }
-              ci.NotMatchPixels++;
+              ci.NotMatchPixels++;  
               conformanceInfo[p.filename().string()] = ci;
             }
             ++opIt;
