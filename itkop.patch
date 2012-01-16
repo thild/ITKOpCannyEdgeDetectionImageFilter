@@ -1,6 +1,6 @@
-diff -uNr InsightToolkit-3.16.0-Original/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx InsightToolkit-3.16.0-Op/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx
---- InsightToolkit-3.16.0-Original/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2009-08-17 09:01:33.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2012-01-16 05:08:13.010463829 -0200
+diff -uNBr Original-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx Op-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx
+--- Original-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2009-08-17 09:01:33.000000000 -0300
++++ Op-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2012-01-16 05:08:13.010463829 -0200
 @@ -23,6 +23,7 @@
  #include "itkNumericTraits.h"
  #include "itkProgressReporter.h"
@@ -62,9 +62,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//BasicFilters/itkCannyEdgeDetectio
  }
  
  template< class TInputImage, class TOutputImage >
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/CMakeLists.txt InsightToolkit-3.16.0-Op/Code//Common/CMakeLists.txt
---- InsightToolkit-3.16.0-Original/Code//Common/CMakeLists.txt	2009-02-11 21:13:55.000000000 -0200
-+++ InsightToolkit-3.16.0-Op/Code//Common/CMakeLists.txt	2012-01-16 05:08:13.132458562 -0200
+diff -uNBr Original-Code//Common/CMakeLists.txt Op-Code//Common/CMakeLists.txt
+--- Original-Code//Common/CMakeLists.txt	2009-02-11 21:13:55.000000000 -0200
++++ Op-Code//Common/CMakeLists.txt	2012-01-16 05:08:13.132458562 -0200
 @@ -1,5 +1,7 @@
  # Sources of non-templated classes.
  SET(ITKCommon_SRCS
@@ -73,9 +73,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/CMakeLists.txt InsightTool
    itkBarrier.cxx
    itkBloxItem.cxx
    itkChainCodePath2D.cxx
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.cxx InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.cxx
---- InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.cxx	1969-12-31 21:00:00.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.cxx	2012-01-16 05:08:13.161457305 -0200
+diff -uNBr Original-Code//Common/itkAlignedBuffer.cxx Op-Code//Common/itkAlignedBuffer.cxx
+--- Original-Code//Common/itkAlignedBuffer.cxx	1969-12-31 21:00:00.000000000 -0300
++++ Op-Code//Common/itkAlignedBuffer.cxx	2012-01-16 05:08:13.161457305 -0200
 @@ -0,0 +1,86 @@
 +#include "itkAlignedBuffer.h"
 +
@@ -163,9 +163,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.cxx Insig
 +
 +} //namespace ITK
 +
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.h InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.h
---- InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.h	1969-12-31 21:00:00.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkAlignedBuffer.h	2012-01-16 05:08:13.162457265 -0200
+diff -uNBr Original-Code//Common/itkAlignedBuffer.h Op-Code//Common/itkAlignedBuffer.h
+--- Original-Code//Common/itkAlignedBuffer.h	1969-12-31 21:00:00.000000000 -0300
++++ Op-Code//Common/itkAlignedBuffer.h	2012-01-16 05:08:13.162457265 -0200
 @@ -0,0 +1,63 @@
 +#ifndef __itkAlignedBuffer_h
 +#define __itkAlignedBuffer_h
@@ -230,9 +230,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkAlignedBuffer.h Insight
 +} // end namespace itk
 +
 +#endif 
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkConstNeighborhoodIterator.txx InsightToolkit-3.16.0-Op/Code//Common/itkConstNeighborhoodIterator.txx
---- InsightToolkit-3.16.0-Original/Code//Common/itkConstNeighborhoodIterator.txx	2006-08-02 08:48:41.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkConstNeighborhoodIterator.txx	2012-01-16 05:08:13.192455968 -0200
+diff -uNBr Original-Code//Common/itkConstNeighborhoodIterator.txx Op-Code//Common/itkConstNeighborhoodIterator.txx
+--- Original-Code//Common/itkConstNeighborhoodIterator.txx	2006-08-02 08:48:41.000000000 -0300
++++ Op-Code//Common/itkConstNeighborhoodIterator.txx	2012-01-16 05:08:13.192455968 -0200
 @@ -557,6 +557,8 @@
    const OffsetValueType *offset   = m_ConstImage->GetOffsetTable();
    const IndexType imageBRStart  = m_ConstImage->GetBufferedRegion().GetIndex();
@@ -251,9 +251,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkConstNeighborhoodIterat
                                  - ( m_Bound[i] - m_BeginIndex[i] )) * offset[i];
      }
    m_WrapOffset[Dimension-1] = 0; // last offset is zero because there are no
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImageBase.h InsightToolkit-3.16.0-Op/Code//Common/itkImageBase.h
---- InsightToolkit-3.16.0-Original/Code//Common/itkImageBase.h	2009-07-12 07:52:52.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkImageBase.h	2012-01-16 05:08:13.096460119 -0200
+diff -uNBr Original-Code//Common/itkImageBase.h Op-Code//Common/itkImageBase.h
+--- Original-Code//Common/itkImageBase.h	2009-07-12 07:52:52.000000000 -0300
++++ Op-Code//Common/itkImageBase.h	2012-01-16 05:08:13.096460119 -0200
 @@ -611,7 +611,7 @@
     * along a row, column, slice, volume, etc. These offsets are based
     * on the size of the BufferedRegion. This should be called after
@@ -279,9 +279,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImageBase.h InsightTool
    RegionType          m_LargestPossibleRegion;
    RegionType          m_RequestedRegion;
    RegionType          m_BufferedRegion;
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImage.h InsightToolkit-3.16.0-Op/Code//Common/itkImage.h
---- InsightToolkit-3.16.0-Original/Code//Common/itkImage.h	2009-08-14 10:28:21.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkImage.h	2012-01-16 05:08:13.070461245 -0200
+diff -uNBr Original-Code//Common/itkImage.h Op-Code//Common/itkImage.h
+--- Original-Code//Common/itkImage.h	2009-08-14 10:28:21.000000000 -0300
++++ Op-Code//Common/itkImage.h	2012-01-16 05:08:13.070461245 -0200
 @@ -26,6 +26,7 @@
  #include "itkFixedArray.h"
  #include "itkWeakPointer.h"
@@ -303,9 +303,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImage.h InsightToolkit-
    /** Compute helper matrices used to transform Index coordinates to
     * PhysicalPoint coordinates and back. This method is virtual and will be
     * overloaded in derived classes in order to provide backward compatibility
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImage.txx InsightToolkit-3.16.0-Op/Code//Common/itkImage.txx
---- InsightToolkit-3.16.0-Original/Code//Common/itkImage.txx	2009-08-14 08:40:36.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkImage.txx	2012-01-16 05:08:13.082460724 -0200
+diff -uNBr Original-Code//Common/itkImage.txx Op-Code//Common/itkImage.txx
+--- Original-Code//Common/itkImage.txx	2009-08-14 08:40:36.000000000 -0300
++++ Op-Code//Common/itkImage.txx	2012-01-16 05:08:13.082460724 -0200
 @@ -175,6 +175,36 @@
  #endif
  }
@@ -343,9 +343,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkImage.txx InsightToolki
  
  /**
   *
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.cxx InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.cxx
---- InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.cxx	1969-12-31 21:00:00.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.cxx	2012-01-16 05:08:13.177456616 -0200
+diff -uNBr Original-Code//Common/itkStopWatch.cxx Op-Code//Common/itkStopWatch.cxx
+--- Original-Code//Common/itkStopWatch.cxx	1969-12-31 21:00:00.000000000 -0300
++++ Op-Code//Common/itkStopWatch.cxx	2012-01-16 05:08:13.177456616 -0200
 @@ -0,0 +1,195 @@
 +// 
 +// StopWatch.cxx
@@ -542,9 +542,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.cxx InsightTo
 +    static map<string, StopWatch> instances;
 +    return &instances[tag];
 +}
-diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.h InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.h
---- InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.h	1969-12-31 21:00:00.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//Common/itkStopWatch.h	2012-01-16 05:08:13.182456401 -0200
+diff -uNBr Original-Code//Common/itkStopWatch.h Op-Code//Common/itkStopWatch.h
+--- Original-Code//Common/itkStopWatch.h	1969-12-31 21:00:00.000000000 -0300
++++ Op-Code//Common/itkStopWatch.h	2012-01-16 05:08:13.182456401 -0200
 @@ -0,0 +1,172 @@
 +// 
 +// StopWatch.h
@@ -718,9 +718,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//Common/itkStopWatch.h InsightTool
 +template <class T> T* Singleton<T>::m_pInstance=NULL;
 +
 +#endif // _STOPWATCH_H_
-diff -uNr InsightToolkit-3.16.0-Original/Code//IO/itkImageFileReader.txx InsightToolkit-3.16.0-Op/Code//IO/itkImageFileReader.txx
---- InsightToolkit-3.16.0-Original/Code//IO/itkImageFileReader.txx	2009-08-11 09:45:07.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//IO/itkImageFileReader.txx	2012-01-16 05:08:13.244453720 -0200
+diff -uNBr Original-Code//IO/itkImageFileReader.txx Op-Code//IO/itkImageFileReader.txx
+--- Original-Code//IO/itkImageFileReader.txx	2009-08-11 09:45:07.000000000 -0300
++++ Op-Code//IO/itkImageFileReader.txx	2012-01-16 05:08:13.244453720 -0200
 @@ -24,6 +24,8 @@
  #include "itkImageRegion.h"
  #include "itkPixelTraits.h"
@@ -840,9 +840,9 @@ diff -uNr InsightToolkit-3.16.0-Original/Code//IO/itkImageFileReader.txx Insight
 +//    }   
 +//    
 +//    delete [] outputData;
-diff -uNr InsightToolkit-3.16.0-Original/Code//IO/itkImageFileWriter.txx InsightToolkit-3.16.0-Op/Code//IO/itkImageFileWriter.txx
---- InsightToolkit-3.16.0-Original/Code//IO/itkImageFileWriter.txx	2009-08-24 15:08:39.000000000 -0300
-+++ InsightToolkit-3.16.0-Op/Code//IO/itkImageFileWriter.txx	2012-01-16 05:08:13.259453070 -0200
+diff -uNBr Original-Code//IO/itkImageFileWriter.txx Op-Code//IO/itkImageFileWriter.txx
+--- Original-Code//IO/itkImageFileWriter.txx	2009-08-24 15:08:39.000000000 -0300
++++ Op-Code//IO/itkImageFileWriter.txx	2012-01-16 05:08:13.259453070 -0200
 @@ -26,6 +26,8 @@
  #include "itkVectorImage.h"
  #include "itkImageRegionConstIterator.h"
