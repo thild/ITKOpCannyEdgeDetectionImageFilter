@@ -182,7 +182,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
             ImageToImageFilterTest::Pointer cannyFilter;
             
             if(alg == "OpCannyEdgeDetectionImageFilter") {
-              f = "results/" + dataSet + "/op/" + p.filename();
+              f = "results/" + string(dataSet) + "/op/" + string(p.filename());
               cannyFilter = OpCannyFilter::New();
               OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
@@ -190,7 +190,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
               filter->SetLowerThreshold( lowerThreshold );
             }
             else {
-              f = "results/" + dataSet + "/native/" + p.filename();
+              f = "results/" + string(dataSet) + "/native/" + string(p.filename());
               cannyFilter = CannyFilter::New();
               CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
