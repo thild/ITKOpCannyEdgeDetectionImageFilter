@@ -59,6 +59,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
+#include <boost/const_string/concatenation.hpp>
 
 #define foreach BOOST_FOREACH
 
