@@ -56,6 +56,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <utility>
+#define BOOST_FILESYSTEM_VERSION 3
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
@@ -144,8 +145,7 @@ struct CheckpointStatistics {
   CheckpointStatistics()  {  }
 };
 
-void TestDataset(string alg, string datasetsPath, string dataSet, int iterations, double variance, double upperThreshold, double lowerThreshold) {
-    std::cout << "Testing " << dataSet << " dataset..." << std::endl; 
+void TestDataset(string alg, string datasetsPath, string dataSet, int iterations, bool testIO, double variance, double upperThreshold, double lowerThreshold) {
     fs::path current_dir(datasetsPath + dataSet); 
     vector<Checkpoint> checkpoints;
     int nfiles = 0;
@@ -160,27 +160,90 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
       if (is_regular_file(p)) { 
         ++nfiles;
-        for (int i = 0; i < iterations; ++i) { 
-          StopWatch swIO; 
-          swIO.Start();
-          string f;
+        if (testIO) {
+          for (int i = 0; i < iterations; ++i) { 
+            StopWatch swIO; 
+            swIO.Start();
+            string f;
+            try { 
+              ReaderType::Pointer reader = ReaderType::New();
+              reader->SetFileName(p.string());
+              
+              StopWatch* swTemp = StopWatchPool::GetStopWatch("ImageFileReader");
+              swTemp->StartNew();
+              reader->Update();
+              readerStat.push_back(swTemp->GetElapsedTime());
+            
+              CastToRealFilterType::Pointer toReal = CastToRealFilterType::New();  
+              toReal->SetInput( reader->GetOutput() );
+              toReal->Update();
+              
+              ImageToImageFilterTest::Pointer cannyFilter;
+              
+              if(alg == "OpCannyEdgeDetectionImageFilter") {
+                f = "results/" + dataSet + "/op/" + p.filename().string();
+                cannyFilter = OpCannyFilter::New();
+                OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
+                filter->SetVariance( variance );
+                filter->SetUpperThreshold( upperThreshold );
+                filter->SetLowerThreshold( lowerThreshold );
+              }
+              else {
+                f = "results/" + dataSet + "/native/" + p.filename().string();
+                cannyFilter = CannyFilter::New();
+                CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
+                filter->SetVariance( variance );
+                filter->SetUpperThreshold( upperThreshold );
+                filter->SetLowerThreshold( lowerThreshold );
+              }
+              
+              cannyFilter->SetInput( toReal->GetOutput() );
+              StopWatch swFilter; 
+              swFilter.Start();
+              cannyFilter->Update();
+              swFilter.Stop();
+              filterStat.push_back(swFilter.GetElapsedTime());
+              processingStat.push_back(StopWatchPool::GetStopWatch(alg)->GetElapsedTime());
+              vector<Checkpoint> result = 
+                StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
+              checkpoints.insert (checkpoints.end(), result.begin(), result.end());
+  
+              
+              RescaleFilter::Pointer rescale = RescaleFilter::New();
+              rescale->SetOutputMinimum(   0 );
+              rescale->SetOutputMaximum( 255 );
+              rescale->SetInput( cannyFilter->GetOutput() );
+              rescale->Update();
+              
+              WriterType::Pointer writer = WriterType::New();
+              writer->SetFileName( f );
+              writer->SetInput( rescale->GetOutput() );
+              swTemp = StopWatchPool::GetStopWatch("ImageFileWriter");
+              swTemp->StartNew();
+              writer->Update(); 
+              swTemp->Stop();
+              writerStat.push_back(swTemp->GetElapsedTime());
+            }
+            catch( itk::ExceptionObject & err ) 
+            { 
+              std::cout << "ExceptionObject caught !" << std::endl; 
+              std::cout << err << std::endl; 
+              throw err;
+            } 
+            swIO.Stop();
+            ioStat.push_back(swIO.GetElapsedTime()); 
+          }
+        }
+        else {
           try { 
             ReaderType::Pointer reader = ReaderType::New();
             reader->SetFileName(p.string());
-            
-            StopWatch* swTemp = StopWatchPool::GetStopWatch("ImageFileReader");
-            swTemp->StartNew();
             reader->Update();
-            readerStat.push_back(swTemp->GetElapsedTime());
-          
             CastToRealFilterType::Pointer toReal = CastToRealFilterType::New();  
             toReal->SetInput( reader->GetOutput() );
             toReal->Update();
-            
             ImageToImageFilterTest::Pointer cannyFilter;
-            
             if(alg == "OpCannyEdgeDetectionImageFilter") {
-              f = "results/" + string(dataSet) + "/op/" + string(p.filename().string());
               cannyFilter = OpCannyFilter::New();
               OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
@@ -188,90 +251,111 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
               filter->SetLowerThreshold( lowerThreshold );
             }
             else {
-              f = "results/" + string(dataSet) + "/native/" + string(p.filename().string());
               cannyFilter = CannyFilter::New();
               CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
               filter->SetVariance( variance );
               filter->SetUpperThreshold( upperThreshold );
               filter->SetLowerThreshold( lowerThreshold );
             }
-            
-            cannyFilter->SetInput( toReal->GetOutput() );
-//            cannyFilter->SetNumberOfThreads(1);
-            
-            
-            StopWatch swFilter; 
-            swFilter.Start();
-            cannyFilter->Update();
-            swFilter.Stop();
-            filterStat.push_back(swFilter.GetElapsedTime());
-            processingStat.push_back(StopWatchPool::GetStopWatch(alg)->GetElapsedTime());
-            vector<Checkpoint> result = 
-              StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
-            checkpoints.insert (checkpoints.end(), result.begin(), result.end());
-
-            
-            RescaleFilter::Pointer rescale = RescaleFilter::New();
-            rescale->SetOutputMinimum(   0 );
-            rescale->SetOutputMaximum( 255 );
-            rescale->SetInput( cannyFilter->GetOutput() );
-            rescale->Update();
-            
-            WriterType::Pointer writer = WriterType::New();
-            writer->SetFileName( f );
-            writer->SetInput( rescale->GetOutput() );
-            swTemp = StopWatchPool::GetStopWatch("ImageFileWriter");
-            swTemp->StartNew();
-            writer->Update(); 
-            swTemp->Stop();
-            writerStat.push_back(swTemp->GetElapsedTime());
-          }
+            for (int i = 0; i < iterations; ++i) { 
+              cannyFilter->SetInput( toReal->GetOutput() );
+              StopWatch swFilter; 
+              StopWatchPool::GetStopWatch(alg)->Reset();
+              StopWatchPool::GetStopWatch(alg)->StartNew();
+              swFilter.Start();
+              cannyFilter->Update();
+              swFilter.Stop();
+              filterStat.push_back(swFilter.GetElapsedTime());
+              processingStat.push_back(StopWatchPool::GetStopWatch(alg)->GetElapsedTime());
+              vector<Checkpoint> result = 
+                StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
+              checkpoints.insert (checkpoints.end(), result.begin(), result.end());
+              cannyFilter->Modified();   
+              
+            }
+          }         
           catch( itk::ExceptionObject & err ) 
           { 
             std::cout << "ExceptionObject caught !" << std::endl; 
             std::cout << err << std::endl; 
             throw err;
           } 
-          swIO.Stop();
-          ioStat.push_back(swIO.GetElapsedTime()); 
         }
       }    
     }
     swTotal.Stop(); 
     
-    cout << string(77, '-') << endl;
-    cout << left << alg << " - Dataset " << dataSet << " - " << nfiles << " files - " << iterations << " iterations" << endl; 
-    cout << string(77, '-') << endl;
+    cout << string(107, '-') << endl;
+    cout << left << alg << " - Dataset " << dataSet << " - " << nfiles << " files - " << 
+        iterations << " iterations - ";
+    if (alg == "OpCannyEdgeDetectionImageFilter" ) {
+      cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
+        " threads ITK - " << omp_get_max_threads() << " threads OMP" << endl; 
+    }
+    else {
+      cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
+        " threads ITK" << endl; 
+    }
+    cout << string(107, '-') << endl;
 
     map<string, StatisticInfo> info = CheckpointStatistics::GetStatistics(checkpoints); 
     
     bool first = true;
+    double mean = 0;
+    double stdev = 0;
     
     for (map<string, StatisticInfo>::iterator it = info.begin(); it != info.end(); it++ ) { 
       StatisticInfo si = it->second;
+      mean = si.Mean;
+      stdev = si.StDev;
       if(first) {
-        cout << left << setw(60) << "Checkpoint" << setw(10) << "Mean" << setw(5) << "StDev" << endl;
-        cout << left << setw(60) << it->first << setw(10) << si.Mean << setw(5) << si.StDev << endl;
+        cout << left << setw(80) << "Checkpoint" << setw(10) << 
+          "Mean" << setw(8) << "StDev" << "%" << endl;
+        cout << left << setw(80) << it->first << setw(10) << mean << setw(8) << 
+          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(4) << endl;
         first = false;  
       }
       else {
-        cout << left << setw(60) << it->first << setw(10) << si.Mean << setw(5) << si.StDev << endl;
+        cout << left << setw(80) << it->first << setw(10) << mean << setw(8) << 
+          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(4) << endl;
       }
     }
     
-    cout << string(77, '-') << endl;
-    cout << left << setw(60) << "Total processing time" << setw(10) << Mean(filterStat) << setw(5) << StDev(filterStat) << endl;
-    cout << string(77, '-') << endl;
-    cout << left << setw(60) << "Total filter time" << setw(10) << Mean(filterStat) << setw(5) << StDev(filterStat) << endl;
-    cout << string(77, '-') << endl;
-    cout << left << setw(60) << "Reader conversion" << setw(10) << Mean(readerStat) << setw(5) << StDev(readerStat) << endl;
-    cout << left << setw(60) << "Writer conversion" << setw(10) << Mean(writerStat) << setw(5) << StDev(writerStat) << endl;
-    cout << string(77, '-') << endl;
-    cout << left << setw(60) << "Total filter chain time (including I/O)" << setw(10) << Mean(ioStat) << setw(5) << StDev(ioStat) << endl;
-    cout << string(77, '-') << endl;
-    cout << left << setw(70) << "Total dataset test time";
+    cout << string(107, '-') << endl;
+    mean = Mean(processingStat);
+    stdev = StDev(processingStat);
+    cout << left << setw(80) << "Total processing time" << setw(10) << 
+      mean << setw(8) << stdev << setprecision(1) <<  
+      stdev / mean * 100 << setprecision(4) << endl;
+    cout << string(107, '-') << endl;
+    mean = Mean(processingStat);
+    stdev = StDev(processingStat);
+    cout << left << setw(80) << "Total filter time" << setw(10) << 
+      mean << setw(8) << stdev << setprecision(1) <<  
+      stdev / mean * 100 << setprecision(4) << endl;
+    cout << string(107, '-') << endl;
+    if(testIO) {
+      mean = Mean(readerStat);
+      stdev = StDev(readerStat);
+      cout << left << setw(80) << "Reader conversion" << setw(10) << 
+        mean << setw(8) << stdev << setprecision(1) <<  
+        stdev / mean * 100 << setprecision(4) << endl;
+      mean = Mean(writerStat);
+      stdev = StDev(writerStat);
+      cout << left << setw(80) << "Writer conversion" << setw(10) << 
+        mean << setw(8) << stdev << setprecision(1) <<  
+        stdev / mean * 100 << setprecision(4) << endl;
+      cout << string(107, '-') << endl;
+      mean = Mean(ioStat);
+      stdev = StDev(ioStat);
+      cout << left << setw(80) << "Total filter chain time (including I/O)" << setw(10) << 
+        mean << setw(8) << stdev << setprecision(1) <<  
+        stdev / mean * 100 << setprecision(4) << endl;
+      cout << string(107, '-') << endl;
+    }
+    cout << left << setw(98) << "Total dataset test time";
     cout << right << swTotal.GetElapsedTime() << endl;
-    cout << string(77, '-') << endl;
+    cout << string(107, '-') << endl;
 }
 
 
@@ -311,10 +395,12 @@ int main (int argc, char *argv[])
       while ( confFile.good() )
       {
           getline (confFile, line);
-          int eqPos = line.find("=");
-          string key = line.substr (0, eqPos);
-          string value = line.substr (eqPos + 1, line.length() - eqPos + 1);
-          config[key] = value;
+          uint eqPos = line.find("=");
+          if (eqPos != string::npos) {
+            string key = line.substr (0, eqPos);
+            string value = line.substr (eqPos + 1, line.length() - eqPos + 1);
+            config[key] = value;
+          }
       }
       confFile.close();
   }
@@ -326,19 +412,32 @@ int main (int argc, char *argv[])
    
   using boost::lexical_cast;
   using boost::bad_lexical_cast;  
- 
+
+  double variance = lexical_cast<float>(config["variance"]);
+  double upperThreshold = lexical_cast<float>(config["upper_threshold"]);
+  double lowerThreshold = lexical_cast<float>(config["lower_threshold"]); 
+  
+  if (config.find("max_threads_omp") != config.end()) {
+    int maxThreads = lexical_cast<int>(config["max_threads_omp"]);
+    omp_set_num_threads(maxThreads);
+  }
+  
+  if (config.find("max_threads_itk") != config.end()) {
+    int maxThreads = lexical_cast<int>(config["max_threads_itk"]);
+    itk::MultiThreader::SetGlobalMaximumNumberOfThreads( maxThreads );  
+  }
+  
   if(performanceTest) {
     fs::path rpath("results");
 //    fs::remove_all(rpath);
     fs::create_directory(rpath);
    
-    float variance = lexical_cast<float>(config["variance"]);
-    float upperThreshold = lexical_cast<float>(config["upper_threshold"]);
-    float lowerThreshold = lexical_cast<float>(config["lower_threshold"]); 
     int iterations = lexical_cast<int>(config["iterations"]);
     
     vector<string> dataSets = split(config["ds"], ',');  
-    
+    bool testIO = config.find("test_io") == config.end() ? true : lexical_cast<int>(config["test_io"]);
+    string algorithm = config["algorithm"];
+//    cout << "testIO" << testIO << endl;
     //for all datasets  
     for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
       
@@ -349,9 +448,17 @@ int main (int argc, char *argv[])
   
       string datasetsPath = config["dsfolder"] +  string("/");
        
-      TestDataset("OpCannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, variance, upperThreshold, lowerThreshold);
-      cout << endl;
-      TestDataset("CannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, variance, upperThreshold, lowerThreshold);
+      if (algorithm == "both") {
+        TestDataset("CannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, testIO, variance, upperThreshold, lowerThreshold);
+        cout << endl;
+        TestDataset("OpCannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, testIO, variance, upperThreshold, lowerThreshold);
+      }
+      else if (algorithm == "native") {
+        TestDataset("CannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, testIO, variance, upperThreshold, lowerThreshold);
+      }
+      else if (algorithm == "op") {
+        TestDataset("OpCannyEdgeDetectionImageFilter", datasetsPath, *ds, iterations, testIO, variance, upperThreshold, lowerThreshold);
+      }
       cout << endl;
       cout << endl;
     }
@@ -360,44 +467,96 @@ int main (int argc, char *argv[])
   if(conformanceTest) {
    
     vector<string> dataSets = split(config["ds"], ',');  
+    string datasetsPath = config["dsfolder"] +  string("/");
+    
     //for all datasets  
     for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
 
-      cout << "Running conformance test..." << endl;
+      cout << "Running " <<  *ds << " dataset conformance test..." << endl;
       
       map<string, ConformanceInfo> conformanceInfo;
-
-      fs::path current_dir("results/" + *ds + "/op" ); 
+      
+      string createPath = "results/conformance/";
+      fs::create_directory(createPath);
+      createPath += *ds;
+      fs::create_directory(createPath);
+      
+      fs::create_directory(createPath + "/op");
+      fs::create_directory(createPath + "/native");
+      
+      fs::path current_dir(datasetsPath + *ds ); 
+      
       fs::directory_iterator it(current_dir), eod;
       
       foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
         if (is_regular_file(p)) { 
         
-//          WriterType::Pointer writer = WriterType::New();
-          
           ReaderType::Pointer opReader = ReaderType::New();
           ReaderType::Pointer nativeReader = ReaderType::New();
           
-          string opFile = "results/" + *ds + "/op/" + p.filename().string();
-          opReader->SetFileName(opFile);
+          //cout << "Reading " + p.string() << endl;
           
-          string nativeFile = "results/" + *ds + "/native/" + p.filename().string();
-          nativeReader->SetFileName(nativeFile);
+          opReader->SetFileName(p.string());
+          nativeReader->SetFileName(p.string());
           
           opReader->Update();
           nativeReader->Update();
+
+          CastToRealFilterType::Pointer opToReal = CastToRealFilterType::New();  
+          opToReal->SetInput( opReader->GetOutput() );
+          opToReal->Update();
+              
+          CastToRealFilterType::Pointer nativeToReal = CastToRealFilterType::New();  
+          nativeToReal->SetInput( nativeReader->GetOutput() );
+          nativeToReal->Update();
+              
+          OpCannyFilter::Pointer opCannyFilter = OpCannyFilter::New();
+          opCannyFilter->SetVariance( variance );
+          opCannyFilter->SetUpperThreshold( upperThreshold );
+          opCannyFilter->SetLowerThreshold( lowerThreshold );
           
+          CannyFilter::Pointer nativeCannyFilter = CannyFilter::New();
+          nativeCannyFilter->SetVariance( variance );
+          nativeCannyFilter->SetUpperThreshold( upperThreshold );
+          nativeCannyFilter->SetLowerThreshold( lowerThreshold );
+              
+          opCannyFilter->SetInput( opToReal->GetOutput() );
+          nativeCannyFilter->SetInput( nativeToReal->GetOutput() );
           
-//          writer->SetFileName(p.parent_path().string() + "/result/op-" + p.filename());
-//          writer->SetInput(opReader->GetOutput());
-//          writer->Update();
-//          
-//          writer->SetFileName(p.parent_path().string() + "/result/native-" + p.filename());
-//          writer->SetInput(nativeReader->GetOutput());
-//          writer->Update();
+          opCannyFilter->Update(); 
+          nativeCannyFilter->Update();
+              
+          RescaleFilter::Pointer opRescale = RescaleFilter::New();
+          opRescale->SetOutputMinimum(   0 );
+          opRescale->SetOutputMaximum( 255 );
+          opRescale->SetInput( opCannyFilter->GetOutput() );
+          opRescale->Update();
           
-          CharImageType::Pointer opIm = opReader->GetOutput();
-          CharImageType::Pointer nativeIm = nativeReader->GetOutput();
+          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
+          nativeRescale->SetOutputMinimum(   0 );
+          nativeRescale->SetOutputMaximum( 255 );
+          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
+          nativeRescale->Update();
+              
+              
+          WriterType::Pointer writer = WriterType::New();
+          string f = "results/conformance/" + *ds + "/op/" + p.filename().string();
+          writer->SetFileName( f );
+          writer->SetInput( opRescale->GetOutput() );
+          writer->Update(); 
+          
+//          cout << "Writing " << f << endl;
+          
+     
+          f = "results/conformance/" + *ds + "/native/" + p.filename().string();
+          writer->SetFileName( f );
+          writer->SetInput( nativeRescale->GetOutput() );
+          writer->Update(); 
+     
+          //cout << "Writing " << f << endl;
+     
+          CharImageType::Pointer opIm = opRescale->GetOutput();
+          CharImageType::Pointer nativeIm = nativeRescale->GetOutput();
           
           ImageIterator  opIt( opIm, opIm->GetLargestPossibleRegion() );
           ImageIterator  nativeIt( nativeIm, nativeIm->GetLargestPossibleRegion());
@@ -433,6 +592,7 @@ int main (int argc, char *argv[])
         cout << left << setw(20) << 
         ci.Image << setw(20) << ci.GetNumberOfPixels() << setw(20) << ci.NotMatchPixels << setw(20) << ci.GetNotMatchPercentage() * 100 << endl;
       }
+      cout << endl << endl;
     }  
   } //dataset iterations
   
