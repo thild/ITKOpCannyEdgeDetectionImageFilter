@@ -1237,6 +1237,8 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
                          
 }
 
+
+
 template< class TInputImage, class TOutputImage >
 void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
@@ -1244,105 +1246,58 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
              float* input1, float* input2,  float* output )
 {
     int stopY = height * stride;
+#ifndef __SSE4_1__
     #pragma omp parallel for
+#endif    
     for (int y = 0; y < stopY - 32; y += 32) {
       int idx = y;      
       __m128 a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
       __m128 b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      __m128 inv0 = _mm_mul_ps(a, b);
       
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      __m128 inv1 = _mm_mul_ps(a, b);
       
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      __m128 inv2 = _mm_mul_ps(a, b);
       
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      __m128 inv3 = _mm_mul_ps(a, b);
 
+      _mm_stream_ps(&output[y], inv0);
+      _mm_stream_ps(&output[y + 4], inv1);
+      _mm_stream_ps(&output[y + 8], inv2);
+      _mm_stream_ps(&output[y + 12], inv3);
+            
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      inv0 = _mm_mul_ps(a, b);
       
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      inv1 = _mm_mul_ps(a, b);
       
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      inv2 = _mm_mul_ps(a, b);
       
       a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
       b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[idx], _mm_mul_ps(a, b));
+      inv3 = _mm_mul_ps(a, b);
+      
+      _mm_stream_ps(&output[y + 16], inv0);
+      _mm_stream_ps(&output[y + 20], inv1);
+      _mm_stream_ps(&output[y + 24], inv2);
+      _mm_stream_ps(&output[y + 28], inv3);
     }
     
     for (int y = stopY - 32; y < stopY; ++y) 
       output[y] = input1[y] * input2[y];  
     
 }
-//
-//
-//template< class TInputImage, class TOutputImage >
-//void
-//OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-//:: Multiply( int stride, int height, 
-//             float* input1, float* input2,  float* output )
-//{
-//    int stopY = height * stride;
-//    #pragma omp parallel for
-//    for (int y = 0; y < stopY - 32; y += 32) {
-//      int idx = y;      
-//      __m128 a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-//      __m128 b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      __m128 inv0 = _mm_mul_ps(a, b);
-//      
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      __m128 inv1 = _mm_mul_ps(a, b);
-//      
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      __m128 inv2 = _mm_mul_ps(a, b);
-//      
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      __m128 inv3 = _mm_mul_ps(a, b);
-//
-//      _mm_stream_ps(&output[y], inv0);
-//      _mm_stream_ps(&output[y + 4], inv1);
-//      _mm_stream_ps(&output[y + 8], inv2);
-//      _mm_stream_ps(&output[y + 12], inv3);
-//            
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      inv0 = _mm_mul_ps(a, b);
-//      
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      inv1 = _mm_mul_ps(a, b);
-//      
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      inv2 = _mm_mul_ps(a, b);
-//      
-//      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
-//      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-//      inv3 = _mm_mul_ps(a, b);
-//      
-//      _mm_stream_ps(&output[y + 16], inv0);
-//      _mm_stream_ps(&output[y + 20], inv1);
-//      _mm_stream_ps(&output[y + 24], inv2);
-//      _mm_stream_ps(&output[y + 28], inv3);
-//    }
-//    
-//    for (int y = stopY - 32; y < stopY; ++y) 
-//      output[y] = input1[y] * input2[y];  
-//    
-//}
 
 template <class TInputImage, class TOutputImage>
 void 
