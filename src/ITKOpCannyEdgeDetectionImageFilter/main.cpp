@@ -83,7 +83,7 @@ typedef itk::Image< RealPixelType, Dimension >    RealImageType;
 typedef itk::ImageFileReader< CharImageType >  ReaderType;
 typedef itk::ImageFileWriter< CharImageType >  WriterType;
 
-typedef itk::ImageRegionIterator<CharImageType> ImageIterator;
+typedef itk::ImageRegionIterator<RealImageType> ImageIterator;
 
 typedef itk::CastImageFilter< CharImageType, RealImageType> CastToRealFilterType;
 typedef itk::CastImageFilter< RealImageType, CharImageType> CastToCharFilterType;
@@ -101,20 +101,22 @@ struct StatisticInfo {
   double StDev; 
 };
 
-struct ConformanceInfo {
-  public:
-  ConformanceInfo() : Width(0), Height(0), NotMatchPixels(0) {}
-  int Width;
-  int Height; 
-  string Image;
-  long NotMatchPixels;
-  double GetNotMatchPercentage() {
-     return (double)NotMatchPixels / (double)GetNumberOfPixels();
-  }
-  long GetNumberOfPixels() {
-     return Width * Height;
-  }
-};
+//struct ConformanceInfo {
+//  public:
+//  ConformanceInfo() : Width(0), Height(0), CorrectlyDetect(0) {}
+//  int Width;
+//  int Height; 
+//  string Image;
+//  long NoDetected;
+//  long ErroneouslyDetected;
+//  long CorrectlyDetect;
+//  double GetNotMatchPercentage() {
+//     return (double)NotMatchPixels / (double)GetNumberOfPixels();
+//  }
+//  long GetNumberOfPixels() {
+//     return Width * Height;
+//  }
+//};
 
 struct CheckpointStatistics {
   public:
@@ -469,12 +471,17 @@ int main (int argc, char *argv[])
     vector<string> dataSets = split(config["ds"], ',');  
     string datasetsPath = config["dsfolder"] +  string("/");
     
+    
     //for all datasets  
     for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
-
+      long tf = 0;
+     
+      double pnd = 0;
+      double ped = 0;
+     
       cout << "Running " <<  *ds << " dataset conformance test..." << endl;
       
-      map<string, ConformanceInfo> conformanceInfo;
+//      map<string, ConformanceInfo> conformanceInfo;
       
       string createPath = "results/conformance/";
       fs::create_directory(createPath);
@@ -490,7 +497,7 @@ int main (int argc, char *argv[])
       
       foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
         if (is_regular_file(p)) { 
-        
+          ++tf;
           ReaderType::Pointer opReader = ReaderType::New();
           ReaderType::Pointer nativeReader = ReaderType::New();
           
@@ -526,72 +533,113 @@ int main (int argc, char *argv[])
           opCannyFilter->Update(); 
           nativeCannyFilter->Update();
               
-          RescaleFilter::Pointer opRescale = RescaleFilter::New();
-          opRescale->SetOutputMinimum(   0 );
-          opRescale->SetOutputMaximum( 255 );
-          opRescale->SetInput( opCannyFilter->GetOutput() );
-          opRescale->Update();
-          
-          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
-          nativeRescale->SetOutputMinimum(   0 );
-          nativeRescale->SetOutputMaximum( 255 );
-          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
-          nativeRescale->Update();
-              
-              
-          WriterType::Pointer writer = WriterType::New();
-          string f = "results/conformance/" + *ds + "/op/" + p.filename().string();
-          writer->SetFileName( f );
-          writer->SetInput( opRescale->GetOutput() );
-          writer->Update(); 
-          
-//          cout << "Writing " << f << endl;
-          
-     
-          f = "results/conformance/" + *ds + "/native/" + p.filename().string();
-          writer->SetFileName( f );
-          writer->SetInput( nativeRescale->GetOutput() );
-          writer->Update(); 
-     
-          //cout << "Writing " << f << endl;
-     
-          CharImageType::Pointer opIm = opRescale->GetOutput();
-          CharImageType::Pointer nativeIm = nativeRescale->GetOutput();
-          
+//          RescaleFilter::Pointer opRescale = RescaleFilter::New();
+//          opRescale->SetOutputMinimum(   0 );
+//          opRescale->SetOutputMaximum( 255 );
+//          opRescale->SetInput( opCannyFilter->GetOutput() );
+//          opRescale->Update();
+//          
+//          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
+//          nativeRescale->SetOutputMinimum(   0 );
+//          nativeRescale->SetOutputMaximum( 255 );
+//          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
+//          nativeRescale->Update();
+//              
+//              
+//          WriterType::Pointer writer = WriterType::New();
+//          string f = "results/conformance/" + *ds + "/op/" + p.filename().string();
+//          writer->SetFileName( f );
+//          writer->SetInput( opRescale->GetOutput() );
+//          writer->Update(); 
+//          
+////          cout << "Writing " << f << endl;
+//          
+//     
+//          f = "results/conformance/" + *ds + "/native/" + p.filename().string();
+//          writer->SetFileName( f );
+//          writer->SetInput( nativeRescale->GetOutput() );
+//          writer->Update(); 
+//     
+//          //cout << "Writing " << f << endl;
+//     
+//          CharImageType::Pointer opIm = opRescale->GetOutput();
+//          CharImageType::Pointer nativeIm = nativeRescale->GetOutput();
+//          
+//          ImageIterator  opIt( opIm, opIm->GetLargestPossibleRegion() );
+//          ImageIterator  nativeIt( nativeIm, nativeIm->GetLargestPossibleRegion());
+//          
+//            typename RealImageType::SizeType regionSize = opCannyFilter->GetOutput()->GetLargestPossibleRegion().GetSize(); 
+//
+//            float* op =  opCannyFilter->GetOutput()->GetBufferPointer() ;
+//            float* native =  nativeCannyFilter->GetOutput()->GetBufferPointer() ; 
+//            int imageStride = opCannyFilter->GetOutput()->GetOffsetTable()[1];
+// 
+//            for (uint y = 0; y < regionSize[1]; ++y) { 
+//              uint x = 0;
+//              for (; x < regionSize[1] - 4; x += 4) {
+//              
+//                __m128 opv = _mm_load_ps(&op[y * imageStride + x]); 
+//                __m128 nativev = _mm_load_ps(&native[y * imageStride + x]); 
+//                
+//                unsigned int mask = _mm_movemask_ps(_mm_cmpeq_ps(opv, nativev)); 
+//                if (mask == 0xFFF) continue;
+//                cout << "Not equal" << endl;
+//                 
+//                if(mask & 1) //pixel 0  
+//                {
+//                } 
+//                     
+//                if((mask & 2) >> 1) //pixel 1
+//                {
+//                } 
+//                     
+//                if((mask & 4) >> 2) //pixel 2
+//                {
+//                } 
+//                     
+//                if((mask & 8) >> 3) //pixel 3
+//                {
+//                } 
+//              }       
+//            }
+//      
+//     
+      
+                  
+          RealImageType::Pointer opIm = opCannyFilter->GetOutput();
+          RealImageType::Pointer nativeIm = nativeCannyFilter->GetOutput();
+
           ImageIterator  opIt( opIm, opIm->GetLargestPossibleRegion() );
           ImageIterator  nativeIt( nativeIm, nativeIm->GetLargestPossibleRegion());
           
-          typename CharImageType::SizeType regionSize = opIm->GetLargestPossibleRegion().GetSize();
-          
           opIt.GoToBegin();
           nativeIt.GoToBegin();
+          long tp = 0;
+          long nd = 0;
+          long ed = 0;
+          cout.precision(6);
           while( !opIt.IsAtEnd() && !nativeIt.IsAtEnd() )
-          {
-            bool equal = opIt.Get() == nativeIt.Get();
-            if (!equal) {
-              ConformanceInfo ci = conformanceInfo[p.filename().string()];
-              if (ci.NotMatchPixels == 0) {
-                ci.Width = regionSize[0];
-                ci.Height = regionSize[1];
-                ci.Image = p.filename().string();
-              }
-              ci.NotMatchPixels++;  
-              conformanceInfo[p.filename().string()] = ci;
-            }
+          { 
+            float  op = opIt.Get();
+            float  n =  nativeIt.Get();
+            if (op == 0 && n == 1) {
+              ++nd;  
+            } 
+            else if (op == 1 && n == 0) {
+              ++ed;  
+            }  
+            ++tp;
             ++opIt;
             ++nativeIt;
-          }    
+          }
+          //pcd += cd / tp; 
+          pnd += (double)nd / (double)tp; 
+          ped += (double)ed / (double)tp;  
         }   
       } //conformance test iterations
-        cout << left << setw(20) <<  
-        "Image" << setw(20) << "total pixels" << setw(20) << "not match pixels" << setw(20) << "%" << endl;
-      for ( map<string, ConformanceInfo>::iterator it = conformanceInfo.begin(); 
-                                                   it != conformanceInfo.end(); 
-                                                   it++ ) { 
-        ConformanceInfo ci = it->second;
-        cout << left << setw(20) << 
-        ci.Image << setw(20) << ci.GetNumberOfPixels() << setw(20) << ci.NotMatchPixels << setw(20) << ci.GetNotMatchPercentage() * 100 << endl;
-      }
+      cout << left << setw(20) <<  
+      "Correclty detected" << setw(20) << "Not detected" << setw(20) << "Erroneously detected" << setw(20) << endl;
+      cout << left << setw(20) << (1 - (ped / tf + pnd / tf)) * 100 << setw(20)  << pnd / tf * 100 << setw(20) << ped / tf * 100 << endl;
       cout << endl << endl;
     }  
   } //dataset iterations
