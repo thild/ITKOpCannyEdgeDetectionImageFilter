@@ -1243,10 +1243,9 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 :: Multiply( int stride, int height, 
              float* input1, float* input2,  float* output )
 {
-    int startY  = 0;
-    int stopY   = height * stride;
-    int y = startY;
-    for (; y < stopY - 32; y += 32) {
+    int stopY = height * stride;
+    #pragma omp parallel for
+    for (int y = 0; y < stopY - 32; y += 32) {
       int idx = y;      
       __m128 a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
       __m128 b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
@@ -1291,9 +1290,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
       _mm_stream_ps(&output[y + 28], inv3);
     }
     
-    y -= 32;
-    
-    for (; y < stopY; ++y) 
+    for (int y = stopY - 32; y < stopY; ++y) 
       output[y] = input1[y] * input2[y];  
     
 }
