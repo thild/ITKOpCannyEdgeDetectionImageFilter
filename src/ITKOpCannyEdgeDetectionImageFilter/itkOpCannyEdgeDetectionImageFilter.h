@@ -406,7 +406,9 @@ private:
                   float* input, float* output);  
   
   void Multiply( int stride, int height, 
-             float* input1, float* input2,  float* output );
+             const float* __restrict input1, 
+             const float* __restrict input2,  
+             float* __restrict output );
              
   
   /** This allocate storage for m_UpdateBuffer, m_UpdateBuffer1 */
