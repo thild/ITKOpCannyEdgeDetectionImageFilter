@@ -1245,11 +1245,57 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 {
     int startY  = 0;
     int stopY   = height * stride;
-    for (int y = startY; y < stopY; y += 4) {
-        __m128 inv0 = _mm_load_ps(&input1[y]);   PRINT_VECTOR(inv0);
-        __m128 inv1 = _mm_load_ps(&input2[y]);   PRINT_VECTOR(inv1);
-        _mm_stream_ps(&output[y], _mm_mul_ps(inv0, inv1));
+    int y = startY;
+    for (; y < stopY - 32; y += 32) {
+      int idx = y;      
+      __m128 a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+      __m128 b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      __m128 inv0 = _mm_mul_ps(a, b);
+      
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      __m128 inv1 = _mm_mul_ps(a, b);
+      
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      __m128 inv2 = _mm_mul_ps(a, b);
+      
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      __m128 inv3 = _mm_mul_ps(a, b);
+
+      _mm_stream_ps(&output[y], inv0);
+      _mm_stream_ps(&output[y + 4], inv1);
+      _mm_stream_ps(&output[y + 8], inv2);
+      _mm_stream_ps(&output[y + 12], inv3);
+            
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      inv0 = _mm_mul_ps(a, b);
+      
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      inv1 = _mm_mul_ps(a, b);
+      
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      inv2 = _mm_mul_ps(a, b);
+      
+      a = _mm_load_ps(&input1[idx += 4]);   PRINT_VECTOR(inv0);
+      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+      inv3 = _mm_mul_ps(a, b);
+      
+      _mm_stream_ps(&output[y + 16], inv0);
+      _mm_stream_ps(&output[y + 20], inv1);
+      _mm_stream_ps(&output[y + 24], inv2);
+      _mm_stream_ps(&output[y + 28], inv3);
     }
+    
+    y -= 32;
+    
+    for (; y < stopY; ++y) 
+      output[y] = input1[y] * input2[y];  
+    
 }
 
 
