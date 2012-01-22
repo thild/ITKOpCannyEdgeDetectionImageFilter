@@ -28,8 +28,6 @@
 
 #include "opConvolutionFilter.h"
 
-
-
 #include <omp.h>
 #ifdef __SSE4_1__
 #include <smmintrin.h>  
@@ -170,7 +168,6 @@ void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 ::GenerateData()
 {
-
 //  // Allocate the output
   this->GetOutput()->SetBufferedRegion( this->GetOutput()->GetRequestedRegion() );
   this->GetOutput()->Allocate();
@@ -221,7 +218,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   this->HysteresisThresholding();                    
   b.Stop();
   sw->AddCheckpoint("HysteresisThresholding");
-                 
+             
   sw->Stop();
   sw->Stop();
 }

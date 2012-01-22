@@ -24,6 +24,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
+#define CALLGRIND
+
 #if defined(_MSC_VER)
 #pragma warning ( disable : 4786 ) 
 #endif  
@@ -60,6 +62,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
+
+#include <valgrind/callgrind.h>
 
 #define foreach BOOST_FOREACH
 
@@ -202,7 +206,13 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
               cannyFilter->SetInput( toReal->GetOutput() );
               StopWatch swFilter; 
               swFilter.Start();
+#ifdef CALLGRIND              
+              CALLGRIND_START_INSTRUMENTATION;
+#endif              
               cannyFilter->Update();
+#ifdef CALLGRIND              
+              CALLGRIND_STOP_INSTRUMENTATION;
+#endif              
               swFilter.Stop();
               filterStat.push_back(swFilter.GetElapsedTime());
               processingStat.push_back(StopWatchPool::GetStopWatch(alg)->GetElapsedTime());
@@ -476,8 +486,9 @@ int main (int argc, char *argv[])
     for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
       long tf = 0;
      
+      double pco = 0;
       double pnd = 0;
-      double ped = 0;
+      double pfa = 0;
      
       cout << "Running " <<  *ds << " dataset conformance test..." << endl;
       
@@ -615,31 +626,43 @@ int main (int argc, char *argv[])
           opIt.GoToBegin();
           nativeIt.GoToBegin();
           long tp = 0;
-          long nd = 0;
-          long ed = 0;
+          long fn = 0;
+          long fp = 0;
+          long ni = 0;
+          long nb = 0;
           cout.precision(6);
           while( !opIt.IsAtEnd() && !nativeIt.IsAtEnd() )
           { 
             float  op = opIt.Get();
             float  n =  nativeIt.Get();
-            if (op == 0 && n == 1) {
-              ++nd;  
+            if (n == 1) ++ni;
+            if (op == 1) ++nb;
+            if (op == 1 && n == 1) {
+              ++tp;
+            }
+            else if (op == 0 && n == 1) {
+              ++fn;  
             } 
             else if (op == 1 && n == 0) {
-              ++ed;  
+              ++fp;  
             }  
-            ++tp;
             ++opIt;
             ++nativeIt;
           }
           //pcd += cd / tp; 
-          pnd += (double)nd / (double)tp; 
-          ped += (double)ed / (double)tp;  
+          pco += (double)tp / (double)max(ni, nb); 
+//          cout << tp << endl;
+//          cout << ni << endl;
+//          cout << nb << endl;
+//          cout << max(ni, nb) << endl;
+//          cout << pco << endl;
+          pnd += (double)fn / (double)max(ni, nb);
+          pfa += (double)fp / (double)max(ni, nb); 
         }   
       } //conformance test iterations
       cout << left << setw(20) <<  
       "Correclty detected" << setw(20) << "Not detected" << setw(20) << "Erroneously detected" << setw(20) << endl;
-      cout << left << setw(20) << (1 - (ped / tf + pnd / tf)) * 100 << setw(20)  << pnd / tf * 100 << setw(20) << ped / tf * 100 << endl;
+      cout << left << setw(20) << pco / tf * 100 << setw(20)  << pnd / tf * 100  << setw(20) << pfa / tf * 100 << endl;
       cout << endl << endl;
     }  
   } //dataset iterations
