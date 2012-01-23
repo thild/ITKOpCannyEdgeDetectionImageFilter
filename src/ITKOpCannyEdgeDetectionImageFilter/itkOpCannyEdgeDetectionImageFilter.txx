@@ -905,11 +905,11 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         
         __m128 out = _mm_and_ps(lessThan, maskThat);
         
-        if (_mm_movemask_ps(out) == 0xf) {
-          out = _mm_and_ps(out, one);
-          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
-          continue;
-        }
+//        if (_mm_movemask_ps(out) == 0xf) {
+//          out = _mm_and_ps(out, one);
+//          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
+//          continue;
+//        }
         
         that = _mm_load_ps(&inputImage[(y + 2) * imageStride + x]);  
                 
@@ -932,11 +932,11 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         
         out = _mm_or_ps(maskThat, out);
         
-        if (_mm_movemask_ps(out) == 0xf) {
-          out = _mm_and_ps(out, one);
-          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
-          continue;
-        }
+//        if (_mm_movemask_ps(out) == 0xf) {
+//          out = _mm_and_ps(out, one);
+//          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
+//          continue;
+//        }
 
         that = _mm_load_ps(&inputImage[(y + 1) * imageStride + x - 4]);  
 #ifdef __SSE4_1__
@@ -966,11 +966,11 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         out = _mm_or_ps(maskThat, out);
         
         
-        if (_mm_movemask_ps(out) == 0xf) {
-          out = _mm_and_ps(out, one);
-          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
-          continue;
-        }
+//        if (_mm_movemask_ps(out) == 0xf) {
+//          out = _mm_and_ps(out, one);
+//          _mm_storeu_ps(&outputImage[(y + 1) * outStride + x], out); 
+//          continue;
+//        }
         
         that = _mm_load_ps(&inputImage[(y + 1) * imageStride + x + 4]);  
         that = _mm_move_ss(thisOne, that); 
