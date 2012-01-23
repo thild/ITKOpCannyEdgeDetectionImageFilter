@@ -939,8 +939,15 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
 
         that = _mm_load_ps(&inputImage[(y + 1) * imageStride + x - 4]);  
+#ifdef __SSE4_1__
         that = _mm_blend_ps(thisOne, that, 8); 
-        
+#else
+        ROTATE_RIGHT(thisOne);
+        ROTATE_RIGHT(that);
+        that = _mm_move_ss(thisOne, that); 
+        ROTATE_LEFT(thisOne);
+        ROTATE_LEFT(that);
+#endif        
         ROTATE_RIGHT(that);
         
         maskThat = _mm_and_ps(that, sign);
@@ -966,7 +973,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         }
         
         that = _mm_load_ps(&inputImage[(y + 1) * imageStride + x + 4]);  
-        that = _mm_blend_ps(thisOne, that, 1); 
+        that = _mm_move_ss(thisOne, that); 
         ROTATE_LEFT(that);
         maskThat = _mm_and_ps(that, sign);
         maskThat = _mm_or_ps(maskThat, one);
@@ -1245,74 +1252,80 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
              float* __restrict output )
 {
 
-    static float miniBuffer[31];
-    int stopY = height * stride;
+  int stopY = height * stride;
+  int startY  = 0;
+  
+#ifdef __SSE4_1__
+  for (int y = startY; y < stopY; y += 4) {
+      __m128 inv0 = _mm_load_ps(&input1[y]);   PRINT_VECTOR(inv0);
+      __m128 inv1 = _mm_load_ps(&input2[y]);   PRINT_VECTOR(inv1);
+      _mm_stream_ps(&output[y], _mm_mul_ps(inv0, inv1));
+  }
+#else
+  int i = 0;
+  static float miniBuffer[31];
+  for (int y = stopY - 31; y < stopY; ++y) {
+    miniBuffer[i++] = input2[y];
+  }
+  #pragma omp parallel for
+  for (int y = startY; y < stopY - 32; y += 32) {
+    int idx = y;      
+    __m128 a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    __m128 b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    __m128 inv0 = _mm_mul_ps(a, b);
     
-    int i = 0;
-    for (int y = stopY - 31; y < stopY; ++y) {
-      miniBuffer[i++] = input2[y];
-    }
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    __m128 inv1 = _mm_mul_ps(a, b);
     
-#ifndef __SSE4_1__
-    #pragma omp parallel for
-#endif    
-    for (int y = 0; y < stopY - 32; y += 32) {
-      int idx = y;      
-      __m128 a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      __m128 b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      __m128 inv0 = _mm_mul_ps(a, b);
-      
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      __m128 inv1 = _mm_mul_ps(a, b);
-      
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      __m128 inv2 = _mm_mul_ps(a, b);
-      
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      __m128 inv3 = _mm_mul_ps(a, b);
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    __m128 inv2 = _mm_mul_ps(a, b);
+    
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    __m128 inv3 = _mm_mul_ps(a, b);
 
-      _mm_stream_ps(&output[y], inv0);
-      _mm_stream_ps(&output[y + 4], inv1);
-      _mm_stream_ps(&output[y + 8], inv2);
-      _mm_stream_ps(&output[y + 12], inv3);
-            
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      inv0 = _mm_mul_ps(a, b);
-      
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      inv1 = _mm_mul_ps(a, b);
-      
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      inv2 = _mm_mul_ps(a, b);
-      
-      idx += 4;
-      a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
-      b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-      inv3 = _mm_mul_ps(a, b);
-      
-      _mm_stream_ps(&output[y + 16], inv0);
-      _mm_stream_ps(&output[y + 20], inv1);
-      _mm_stream_ps(&output[y + 24], inv2);
-      _mm_stream_ps(&output[y + 28], inv3);
-    }
+    _mm_stream_ps(&output[y], inv0);
+    _mm_stream_ps(&output[y + 4], inv1);
+    _mm_stream_ps(&output[y + 8], inv2);
+    _mm_stream_ps(&output[y + 12], inv3);
+          
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    inv0 = _mm_mul_ps(a, b);
     
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    inv1 = _mm_mul_ps(a, b);
+    
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    inv2 = _mm_mul_ps(a, b);
+    
+    idx += 4;
+    a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
+    b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
+    inv3 = _mm_mul_ps(a, b);
+    
+    _mm_stream_ps(&output[y + 16], inv0);
+    _mm_stream_ps(&output[y + 20], inv1);
+    _mm_stream_ps(&output[y + 24], inv2);
+    _mm_stream_ps(&output[y + 28], inv3);
+  }
+  
 //    _mm_sfence();
-    i = 0;
-    for (int y = stopY - 31; y < stopY; ++y) {
-      output[y] = input1[y] * miniBuffer[i++];  
-    }
+  i = 0;
+  for (int y = stopY - 31; y < stopY; ++y) {
+    output[y] = input1[y] * miniBuffer[i++];  
+  }    
+#endif    
     
 }
 
