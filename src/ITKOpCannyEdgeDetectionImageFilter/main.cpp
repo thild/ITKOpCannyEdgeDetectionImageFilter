@@ -24,7 +24,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#define CALLGRIND
+//#define CALLGRIND
 
 #if defined(_MSC_VER)
 #pragma warning ( disable : 4786 ) 
