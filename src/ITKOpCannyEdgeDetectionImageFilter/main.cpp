@@ -101,6 +101,7 @@ typedef itk::ImageToImageFilter<RealImageType, RealImageType> ImageToImageFilter
 
 
 struct StatisticInfo {
+  string Tag;
   double Mean;
   double StDev; 
 };
@@ -297,8 +298,8 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     }
     swTotal.Stop(); 
     
-    cout << string(107, '-') << endl;
-    cout << left << alg << " - Dataset " << dataSet << " - " << nfiles << " files - " << 
+    //cout << string(125, '-') << endl;
+    cout << left << alg << endl << "Dataset " << dataSet << nfiles << " files - " << 
         iterations << " iterations - ";
     if (alg == "OpCannyEdgeDetectionImageFilter" ) {
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
@@ -308,7 +309,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
         " threads ITK" << endl; 
     }
-    cout << string(107, '-') << endl;
+    //cout << string(125, '-') << endl;
 
     map<string, StatisticInfo> info = CheckpointStatistics::GetStatistics(checkpoints); 
     
@@ -316,58 +317,88 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     double mean = 0;
     double stdev = 0;
     
+    StatisticInfo ord[6];
+    
     for (map<string, StatisticInfo>::iterator it = info.begin(); it != info.end(); it++ ) { 
-      StatisticInfo si = it->second;
-      mean = si.Mean;
-      stdev = si.StDev;
-      if(first) {
-        cout << left << setw(80) << "Checkpoint" << setw(10) << 
-          "Mean" << setw(8) << "StDev" << "%" << endl;
-        cout << left << setw(80) << it->first << setw(10) << mean << setw(8) << 
-          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(4) << endl;
-        first = false;  
+      if (it->first == "GaussianBlur") {
+        it->second.Tag = "GaussianBlur";
+        ord[0] = it->second; 
       }
-      else {
-        cout << left << setw(80) << it->first << setw(10) << mean << setw(8) << 
-          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(4) << endl;
+      else if (it->first == "Compute2ndDerivative") {
+        it->second.Tag = "Compute2ndDerivative";
+        ord[1] = it->second; 
+      }
+      else if (it->first == "Compute2ndDerivativePos") {
+        it->second.Tag = "Compute2ndDerivativePos";
+        ord[2] = it->second; 
+      }
+      else if (it->first == "ZeroCrossing") {
+        it->second.Tag = "ZeroCrossing";
+        ord[3] = it->second; 
+      }
+      else if (it->first == "Multiply") {
+        it->second.Tag = "Multiply";
+        ord[4] = it->second; 
+      }
+      else if (it->first == "HysteresisThresholding") {
+        it->second.Tag = "HysteresisThresholding";
+        ord[5] = it->second; 
       }
     }
     
-    cout << string(107, '-') << endl;
+    
+    for ( int i = 0; i < 6; ++i ) {
+      StatisticInfo si = ord[i];
+      mean = si.Mean;
+      stdev = si.StDev;
+      if(first) {
+        cout << left << setw(85) << "Checkpoint" << setw(13) << 
+          "Mean" << setw(13) << "StDev" << "%" << endl;
+        cout << left << setw(85) << si.Tag << setw(13) << setprecision(6) << mean << setw(13) << 
+          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(6) << endl;
+        first = false;  
+      }
+      else {
+        cout << left << setw(85) << si.Tag << setw(13) << mean << setw(13) << 
+          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(6) << endl;
+      }
+    }
+    
+    //cout << string(125, '-') << endl;
     mean = Mean(processingStat);
     stdev = StDev(processingStat);
-    cout << left << setw(80) << "Total processing time" << setw(10) << 
-      mean << setw(8) << stdev << setprecision(1) <<  
-      stdev / mean * 100 << setprecision(4) << endl;
-    cout << string(107, '-') << endl;
+    cout << left << setw(85) << "Total processing time" << setw(13) << 
+      mean << setw(13) << stdev << setprecision(1) <<  
+      stdev / mean * 100 << setprecision(6) << endl;
+    //cout << string(125, '-') << endl;
     mean = Mean(processingStat);
     stdev = StDev(processingStat);
-    cout << left << setw(80) << "Total filter time" << setw(10) << 
-      mean << setw(8) << stdev << setprecision(1) <<  
-      stdev / mean * 100 << setprecision(4) << endl;
-    cout << string(107, '-') << endl;
+    cout << left << setw(85) << "Total filter time" << setw(13) << 
+      mean << setw(13) << stdev << setprecision(1) <<  
+      stdev / mean * 100 << setprecision(6) << endl;
+    //cout << string(125, '-') << endl;
     if(testIO) {
       mean = Mean(readerStat);
       stdev = StDev(readerStat);
-      cout << left << setw(80) << "Reader conversion" << setw(10) << 
-        mean << setw(8) << stdev << setprecision(1) <<  
-        stdev / mean * 100 << setprecision(4) << endl;
+      cout << left << setw(85) << "Reader conversion" << setw(13) << 
+        mean << setw(13) << stdev << setprecision(1) <<  
+        stdev / mean * 100 << setprecision(6) << endl;
       mean = Mean(writerStat);
       stdev = StDev(writerStat);
-      cout << left << setw(80) << "Writer conversion" << setw(10) << 
-        mean << setw(8) << stdev << setprecision(1) <<  
-        stdev / mean * 100 << setprecision(4) << endl;
-      cout << string(107, '-') << endl;
+      cout << left << setw(85) << "Writer conversion" << setw(13) << 
+        mean << setw(13) << stdev << setprecision(1) <<  
+        stdev / mean * 100 << setprecision(6) << endl;
+      //cout << string(125, '-') << endl;
       mean = Mean(ioStat);
       stdev = StDev(ioStat);
-      cout << left << setw(80) << "Total filter chain time (including I/O)" << setw(10) << 
-        mean << setw(8) << stdev << setprecision(1) <<  
-        stdev / mean * 100 << setprecision(4) << endl;
-      cout << string(107, '-') << endl;
+      cout << left << setw(85) << "Total filter chain time (including I/O)" << setw(13) << 
+        mean << setw(13) << stdev << setprecision(1) <<  
+        stdev / mean * 100 << setprecision(6) << endl;
+      //cout << string(125, '-') << endl;
     }
-    cout << left << setw(98) << "Total dataset test time";
-    cout << right << swTotal.GetElapsedTime() << endl;
-    cout << string(107, '-') << endl;
+    cout << left << setw(85) << "Total dataset test time";
+    cout << left << setprecision(3) << swTotal.GetElapsedTime() << endl;
+    //cout <<  string(125, '-')  <<  endl;
 }
 
 
