@@ -939,15 +939,15 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 //        }
 
         that = _mm_load_ps(&inputImage[(y + 1) * imageStride + x - 4]);  
-#ifdef __SSE4_1__
+//#ifdef __SSE4_1__
         that = _mm_blend_ps(thisOne, that, 8); 
-#else
-        ROTATE_RIGHT(thisOne);
-        ROTATE_RIGHT(that);
-        that = _mm_move_ss(thisOne, that); 
-        ROTATE_LEFT(thisOne);
-        ROTATE_LEFT(that);
-#endif        
+//#else
+//        ROTATE_RIGHT(thisOne);
+//        ROTATE_RIGHT(that);
+//        that = _mm_move_ss(thisOne, that); 
+//        ROTATE_LEFT(thisOne);
+//        ROTATE_LEFT(that);
+//#endif        
         ROTATE_RIGHT(that);
         
         maskThat = _mm_and_ps(that, sign);
