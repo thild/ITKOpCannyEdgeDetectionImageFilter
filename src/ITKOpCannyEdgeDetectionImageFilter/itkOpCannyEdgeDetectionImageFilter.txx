@@ -1240,7 +1240,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 //  printImage(width, height, imageStride, output);
                          
 }
-
+ 
 
 
 template< class TInputImage, class TOutputImage >
