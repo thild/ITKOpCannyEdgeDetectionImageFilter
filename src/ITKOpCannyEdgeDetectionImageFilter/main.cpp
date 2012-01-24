@@ -302,8 +302,14 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     cout << left << alg << endl << "Dataset " << dataSet << " - " << nfiles << " files - " << 
         iterations << " iterations - ";
     if (alg == "OpCannyEdgeDetectionImageFilter" ) {
+#ifdef _OPENMP     
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
-        " threads ITK - " << omp_get_max_threads() << " threads OMP" << endl; 
+       " threads ITK - " << omp_get_max_threads() << " threads OMP" << endl; 
+#else
+      cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
+        " threads ITK - " << "OMP is disabled" << endl; 
+#endif
+
     }
     else {
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
@@ -462,7 +468,9 @@ int main (int argc, char *argv[])
   
   if (config.find("max_threads_omp") != config.end()) {
     int maxThreads = lexical_cast<int>(config["max_threads_omp"]);
-    omp_set_num_threads(maxThreads);
+#ifdef _OPENMP     
+     omp_set_num_threads(maxThreads);
+#endif
   }
   
   if (config.find("max_threads_itk") != config.end()) {
