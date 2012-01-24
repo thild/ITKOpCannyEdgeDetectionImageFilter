@@ -309,7 +309,6 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
         " threads ITK - " << "OMP is disabled" << endl; 
 #endif
-
     }
     else {
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
