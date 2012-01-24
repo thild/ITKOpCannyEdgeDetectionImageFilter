@@ -366,24 +366,24 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         dxx_y /*kdxy2*/ = _mm_set_ps(0.0, 0.25, 0.0, -0.25);   
         
         //A
-        dxy = _mm_dp_ps(inv0, dx_y, 113);          
+        dxy = _mm_dp113_ps(inv0, dx_y);
         ROTATE_RIGHT(dx_y);                        
-        dxy += _mm_dp_ps(inv0, dx_y, 226);         
+        dxy += _mm_dp226_ps(inv0, dx_y);         
         ROTATE_RIGHT_BLEND(dx_y, ktmp);                                         
-        dxy += _mm_dp_ps(inv0, dx_y, 196) + _mm_dp_ps(dx_x, ktmp, 20);         
+        dxy += _mm_dp196_ps(inv0, dx_y) + _mm_dp20_ps(dx_x, ktmp);
         ROTATE_RIGHT(ktmp);                                                     
         ROTATE_RIGHT_BLEND(dx_y, ktmp);                                         
-        dxy += _mm_dp_ps(inv0, dx_y, 136) + _mm_dp_ps(dx_x, ktmp, 56);                    
+        dxy += _mm_dp136_ps(inv0, dx_y) + _mm_dp56_ps(dx_x, ktmp);                    
          
         ktmp = _mm_setzero_ps();                                              
-        dxy += _mm_dp_ps(inv2, dxx_y, 113);                                   
+        dxy += _mm_dp113_ps(inv2, dxx_y);
         ROTATE_RIGHT(dxx_y);                                                     
-        dxy += _mm_dp_ps(inv2, dxx_y, 226);                                   
+        dxy += _mm_dp226_ps(inv2, dxx_y);                                   
         ROTATE_RIGHT_BLEND(dxx_y, ktmp);                                         
-        dxy += _mm_dp_ps(inv2, dxx_y, 196) + _mm_dp_ps(dxx_x, ktmp, 20);      
+        dxy += _mm_dp196_ps(inv2, dxx_y) + _mm_dp20_ps(dxx_x, ktmp);      
         ROTATE_RIGHT(ktmp);                                                     
         ROTATE_RIGHT_BLEND(dxx_y, ktmp);                                         
-        dxy += _mm_dp_ps(inv2, dxx_y, 136) + _mm_dp_ps(dxx_x, ktmp, 56);      
+        dxy += _mm_dp136_ps(inv2, dxx_y) + _mm_dp56_ps(dxx_x, ktmp);
         
         //B
         ktmp = inv0;
@@ -408,27 +408,27 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         //E
         register __m128 kdx = _mm_set_ps(0.0, 1.0, -2.0, 1.0);                  
         ktmp = _mm_setzero_ps();                                                
-        dxx_x = _mm_dp_ps(inv1, kdx, 113);                                      
+        dxx_x = _mm_dp113_ps(inv1, kdx);                                      
         ROTATE_RIGHT(kdx);                                                     
-        dxx_x += _mm_dp_ps(inv1, kdx, 226);                                     
+        dxx_x += _mm_dp226_ps(inv1, kdx);                                     
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
         inv2 = dx_x;                                                            
-        dxx_x += _mm_dp_ps(inv1, kdx, 196) + _mm_dp_ps(inv2, ktmp, 20);         
+        dxx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv2, ktmp);
         ROTATE_RIGHT(ktmp);                                                     
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dxx_x += _mm_dp_ps(inv1, kdx, 136) + _mm_dp_ps(inv2, ktmp, 56);         
+        dxx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv2, ktmp);         
         
         //F
         kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);              
         inv2 = dx_x;        PRINT_VECTOR(inv2);
-        dx_x = _mm_dp_ps(inv1, kdx, 113);                   
+        dx_x = _mm_dp113_ps(inv1, kdx);
         ROTATE_RIGHT(kdx);                                                     
-        dx_x += _mm_dp_ps(inv1, kdx, 226);                  
+        dx_x += _mm_dp226_ps(inv1, kdx);
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx_x += _mm_dp_ps(inv1, kdx, 196) + _mm_dp_ps(inv2, ktmp, 20);
+        dx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv2, ktmp);
         ROTATE_RIGHT(ktmp);                                                     
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx_x += _mm_dp_ps(inv1, kdx, 136) + _mm_dp_ps(inv2, ktmp, 56);
+        dx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv2, ktmp);
             
         //G
         inv0 /*deriv*/ = _mm_set1_ps(2.0) * dx_y * dx_x * dxy;                  
@@ -617,14 +617,14 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         
         register __m128 kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);
         ktmp = _mm_setzero_ps();
-        dx2dx_x = _mm_dp_ps(inv1, kdx, 113);
+        dx2dx_x = _mm_dp113_ps(inv1, kdx);
         ROTATE_RIGHT(kdx);                                                     
-        dx2dx_x += _mm_dp_ps(inv1, kdx, 226);
+        dx2dx_x += _mm_dp226_ps(inv1, kdx);
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx2dx_x += _mm_dp_ps(inv1, kdx, 196) + _mm_dp_ps(inv1_4, ktmp, 20);
+        dx2dx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv1_4, ktmp);
         ROTATE_RIGHT(ktmp);                                                     
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx2dx_x += _mm_dp_ps(inv1, kdx, 136) + _mm_dp_ps(inv1_4, ktmp, 56);
+        dx2dx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv1_4, ktmp);
 
         inv0 = _mm_load_ps(&gaussianInput[y * imageStride + x]);            
         inv1 = _mm_load_ps(&gaussianInput[(y + 1) * imageStride + x]);      
@@ -646,14 +646,14 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
         
         kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);
         ktmp = _mm_setzero_ps();
-        dxg_x = _mm_dp_ps(inv1, kdx, 113);
+        dxg_x = _mm_dp113_ps(inv1, kdx);
         ROTATE_RIGHT(kdx);                                                     
-        dxg_x += _mm_dp_ps(inv1, kdx, 226);
+        dxg_x += _mm_dp226_ps(inv1, kdx);
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dxg_x += _mm_dp_ps(inv1, kdx, 196) + _mm_dp_ps(inv1_4, ktmp, 20);
+        dxg_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv1_4, ktmp);
         ROTATE_RIGHT(ktmp);                                                     
         ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dxg_x += _mm_dp_ps(inv1, kdx, 136) + _mm_dp_ps(inv1_4, ktmp, 56);
+        dxg_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv1_4, ktmp);
  
         register __m128 gradMag = _mm_set1_ps(0.0001);
         register __m128 derivPos = _mm_setzero_ps();
