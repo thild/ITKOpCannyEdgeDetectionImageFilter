@@ -299,7 +299,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     swTotal.Stop(); 
     
     //cout << string(125, '-') << endl;
-    cout << left << alg << endl << "Dataset " << dataSet << nfiles << " files - " << 
+    cout << left << alg << endl << "Dataset " << dataSet << " - " << nfiles << " files - " << 
         iterations << " iterations - ";
     if (alg == "OpCannyEdgeDetectionImageFilter" ) {
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
