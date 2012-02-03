@@ -19,7 +19,7 @@
     <SourceDirectory>.</SourceDirectory>
     <OutputName>opcanny</OutputName>
     <CompileTarget>Bin</CompileTarget>
-    <Commandlineparameters>-c</Commandlineparameters>
+    <Commandlineparameters>-pt -c test.cfg</Commandlineparameters>
     <Externalconsole>true</Externalconsole>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">

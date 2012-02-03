@@ -156,99 +156,19 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     fs::path current_dir(datasetsPath + dataSet); 
     vector<Checkpoint> checkpoints;
     int nfiles = 0;
-    fs::directory_iterator it(current_dir), eod;
     StopWatch swTotal; 
     vector <double> readerStat;
     vector <double> writerStat;
     vector <double> filterStat;
-    vector <double> processingStat;
     vector <double> ioStat;
     swTotal.Start();
-    foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
-      if (is_regular_file(p)) { 
-        ++nfiles;
-        if (testIO) {
-          for (int i = 0; i < iterations; ++i) { 
-            StopWatch swIO; 
-            swIO.Start();
-            string f;
-            try { 
-              ReaderType::Pointer reader = ReaderType::New();
-              reader->SetFileName(p.string());
-              
-              StopWatch* swTemp = StopWatchPool::GetStopWatch("ImageFileReader");
-              swTemp->StartNew();
-              reader->Update();
-              readerStat.push_back(swTemp->GetElapsedTime());
-            
-              CastToRealFilterType::Pointer toReal = CastToRealFilterType::New();  
-              toReal->SetInput( reader->GetOutput() );
-              toReal->Update();
-              
-              ImageToImageFilterTest::Pointer cannyFilter;
-              
-              if(alg == "OpCannyEdgeDetectionImageFilter") {
-                f = "results/" + dataSet + "/op/" + p.filename().string();
-                cannyFilter = OpCannyFilter::New();
-                OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
-                filter->SetVariance( variance );
-                filter->SetUpperThreshold( upperThreshold );
-                filter->SetLowerThreshold( lowerThreshold );
-              }
-              else {
-                f = "results/" + dataSet + "/native/" + p.filename().string();
-                cannyFilter = CannyFilter::New();
-                CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
-                filter->SetVariance( variance );
-                filter->SetUpperThreshold( upperThreshold );
-                filter->SetLowerThreshold( lowerThreshold );
-              }
-              
-              cannyFilter->SetInput( toReal->GetOutput() );
-              StopWatch swFilter; 
-              swFilter.Start();
-#ifdef CALLGRIND              
-              CALLGRIND_START_INSTRUMENTATION;
-#endif              
-              cannyFilter->Update();
-#ifdef CALLGRIND              
-              CALLGRIND_STOP_INSTRUMENTATION;
-#endif              
-              swFilter.Stop();
-              filterStat.push_back(swFilter.GetElapsedTime());
-              processingStat.push_back(StopWatchPool::GetStopWatch(alg)->GetElapsedTime());
-              vector<Checkpoint> result = 
-                StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
-              checkpoints.insert (checkpoints.end(), result.begin(), result.end());
-  
-              
-              RescaleFilter::Pointer rescale = RescaleFilter::New();
-              rescale->SetOutputMinimum(   0 );
-              rescale->SetOutputMaximum( 255 );
-              rescale->SetInput( cannyFilter->GetOutput() );
-              rescale->Update();
-              
-              WriterType::Pointer writer = WriterType::New();
-              writer->SetFileName( f );
-              writer->SetInput( rescale->GetOutput() );
-              swTemp = StopWatchPool::GetStopWatch("ImageFileWriter");
-              swTemp->StartNew();
-              writer->Update(); 
-              swTemp->Stop();
-              writerStat.push_back(swTemp->GetElapsedTime());
-            }
-            catch( itk::ExceptionObject & err ) 
-            { 
-              std::cout << "ExceptionObject caught !" << std::endl; 
-              std::cout << err << std::endl; 
-              throw err;
-            } 
-            swIO.Stop();
-            ioStat.push_back(swIO.GetElapsedTime()); 
-          }
-        }
-        else {
-          try { 
+    for (int i = 0; i < iterations; ++i) { 
+      try { 
+        fs::directory_iterator it(current_dir), eod;
+        foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
+//          sleep(0.0016);
+          if (is_regular_file(p)) { 
+            ++nfiles;
             ReaderType::Pointer reader = ReaderType::New();
             reader->SetFileName(p.string());
             reader->Update();
@@ -270,36 +190,32 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
               filter->SetUpperThreshold( upperThreshold );
               filter->SetLowerThreshold( lowerThreshold );
             }
-            for (int i = 0; i < iterations; ++i) { 
-              cannyFilter->SetInput( toReal->GetOutput() );
-              StopWatch swFilter; 
-              StopWatchPool::GetStopWatch(alg)->Reset();
-              StopWatchPool::GetStopWatch(alg)->StartNew();
-              swFilter.Start();
-              cannyFilter->Update();
-              swFilter.Stop();
-              filterStat.push_back(swFilter.GetElapsedTime());
-              processingStat.push_back(StopWatchPool::GetStopWatch(alg)->GetElapsedTime());
-              vector<Checkpoint> result = 
-                StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
-              checkpoints.insert (checkpoints.end(), result.begin(), result.end());
-              cannyFilter->Modified();   
-              
-            }
-          }         
-          catch( itk::ExceptionObject & err ) 
-          { 
-            std::cout << "ExceptionObject caught !" << std::endl; 
-            std::cout << err << std::endl; 
-            throw err;
-          } 
+            cannyFilter->SetInput( toReal->GetOutput() );
+            StopWatch swFilter; 
+            StopWatchPool::GetStopWatch(alg)->Reset();
+            StopWatchPool::GetStopWatch(alg)->StartNew();
+            swFilter.Start();
+            cannyFilter->Update();
+            swFilter.Stop();
+            filterStat.push_back(swFilter.GetElapsedTime());
+            vector<Checkpoint> result = 
+              StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
+            checkpoints.insert (checkpoints.end(), result.begin(), result.end());
+            cannyFilter->Modified();   
+          }
         }
       }    
+      catch( itk::ExceptionObject & err ) 
+      { 
+        std::cout << "ExceptionObject caught !" << std::endl; 
+        std::cout << err << std::endl; 
+        throw err;
+      } 
     }
     swTotal.Stop(); 
     
     //cout << string(125, '-') << endl;
-    cout << left << alg << endl << "Dataset " << dataSet << " - " << nfiles << " files - " << 
+    cout << left << alg << endl << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
         iterations << " iterations - ";
     if (alg == "OpCannyEdgeDetectionImageFilter" ) {
 #ifdef _OPENMP     
@@ -370,39 +286,14 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     }
     
     //cout << string(125, '-') << endl;
-    mean = Mean(processingStat);
-    stdev = StDev(processingStat);
-    cout << left << setw(85) << "Total processing time" << setw(13) << 
-      mean << setw(13) << stdev << setprecision(1) <<  
-      stdev / mean * 100 << setprecision(6) << endl;
-    //cout << string(125, '-') << endl;
-    mean = Mean(processingStat);
-    stdev = StDev(processingStat);
+    mean = Mean(filterStat);
+    stdev = StDev(filterStat);
     cout << left << setw(85) << "Total filter time" << setw(13) << 
       mean << setw(13) << stdev << setprecision(1) <<  
       stdev / mean * 100 << setprecision(6) << endl;
     //cout << string(125, '-') << endl;
-    if(testIO) {
-      mean = Mean(readerStat);
-      stdev = StDev(readerStat);
-      cout << left << setw(85) << "Reader conversion" << setw(13) << 
-        mean << setw(13) << stdev << setprecision(1) <<  
-        stdev / mean * 100 << setprecision(6) << endl;
-      mean = Mean(writerStat);
-      stdev = StDev(writerStat);
-      cout << left << setw(85) << "Writer conversion" << setw(13) << 
-        mean << setw(13) << stdev << setprecision(1) <<  
-        stdev / mean * 100 << setprecision(6) << endl;
-      //cout << string(125, '-') << endl;
-      mean = Mean(ioStat);
-      stdev = StDev(ioStat);
-      cout << left << setw(85) << "Total filter chain time (including I/O)" << setw(13) << 
-        mean << setw(13) << stdev << setprecision(1) <<  
-        stdev / mean * 100 << setprecision(6) << endl;
-      //cout << string(125, '-') << endl;
-    }
     cout << left << setw(85) << "Total dataset test time";
-    cout << left << setprecision(3) << swTotal.GetElapsedTime() << endl;
+    cout << left << mean * nfiles << endl;
     //cout <<  string(125, '-')  <<  endl;
 }
 
@@ -532,7 +423,10 @@ int main (int argc, char *argv[])
       
 //      map<string, ConformanceInfo> conformanceInfo;
       
-      string createPath = "results/conformance/";
+      string createPath = "results";
+      fs::create_directory(createPath);
+      
+      createPath += "/conformance";
       fs::create_directory(createPath);
       createPath += *ds;
       fs::create_directory(createPath);
