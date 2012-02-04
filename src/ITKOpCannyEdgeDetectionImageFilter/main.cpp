@@ -393,21 +393,21 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
         cout << left << setw(80) << si.Tag << setw(13) << setprecision(6) << 
           si.Sum << setw(13) << 
           si.Mean << setw(13) << si.StDev << setprecision(1) <<  setw(13) << 
-          si.StDevPercentage << setw(13) << setprecision(6) << si.Mean / nfiles / iterations << endl;
+          si.StDevPercentage << setw(13) << setprecision(6) << si.Mean / (nfiles / iterations) << endl;
         first = false;  
       }
       else {
         cout << left << setw(80) << si.Tag << setw(13) << setprecision(6) << 
           si.Sum << setw(13) << 
           si.Mean << setw(13) << si.StDev << setprecision(1) <<  setw(13) << 
-          si.StDevPercentage << setprecision(6) << si.Mean / nfiles / iterations << endl;
+          si.StDevPercentage << setprecision(6) << si.Mean / (nfiles / iterations) << endl;
       }
     }
      
     cout << left << setw(80) << "Total dataset time" << setw(13) << 
       datasetStat.TotalTime << setw(13) << 
       datasetStat.MeanTime << setw(13) << datasetStat.StDevTime << setprecision(1) <<  setw(13) << 
-      datasetStat.StDevTimePercentage << setprecision(6) << datasetStat.MeanTime / nfiles / iterations << endl;
+      datasetStat.StDevTimePercentage << setprecision(6) << datasetStat.MeanTime / (nfiles / iterations) << endl;
     //cout <<  string(125, '-')  <<  endl;
 }
 
