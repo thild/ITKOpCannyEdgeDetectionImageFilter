@@ -365,9 +365,8 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     swTotal.Stop();  
     DatasetStatInfo datasetStat(dataSet, iterationStats);
     
-    cout << swTotal.GetElapsedTime() << endl;
     //cout << string(125, '-') << endl;
-    cout << left << alg << endl << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
+    cout << left << alg << " - " << swTotal.GetElapsedTime()  << endl << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
         iterations << " iterations - ";
     if (alg == "OpCannyEdgeDetectionImageFilter" ) {
 #ifdef _OPENMP     
@@ -382,77 +381,33 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
         " threads ITK" << endl; 
     }
-    //cout << string(125, '-') << endl;
-
-//    map<string, CheckpointStatInfo> info = CheckpointStatistics::GetStatistics(checkpoints); 
     
     bool first = true;
-    double mean = 0;
-    double sum = 0;
-    double stdev = 0;
-    
-//    CheckpointStatInfo ord[6];
-//    
-//    for (map<string, CheckpointStatInfo>::iterator it = info.begin(); it != info.end(); it++ ) { 
-//      if (it->first == "GaussianBlur") {
-//        it->second.Tag = "GaussianBlur";
-//        ord[0] = it->second; 
-//      }
-//      else if (it->first == "Compute2ndDerivative") {
-//        it->second.Tag = "Compute2ndDerivative";
-//        ord[1] = it->second; 
-//      }
-//      else if (it->first == "Compute2ndDerivativePos") {
-//        it->second.Tag = "Compute2ndDerivativePos";
-//        ord[2] = it->second; 
-//      }
-//      else if (it->first == "ZeroCrossing") {
-//        it->second.Tag = "ZeroCrossing";
-//        ord[3] = it->second; 
-//      }
-//      else if (it->first == "Multiply") {
-//        it->second.Tag = "Multiply";
-//        ord[4] = it->second; 
-//      }
-//      else if (it->first == "HysteresisThresholding") {
-//        it->second.Tag = "HysteresisThresholding";
-//        ord[5] = it->second; 
-//      }
-//    }
     
     for (vector<CheckpointStatInfo>::iterator it = datasetStat.CheckpointStats.begin(); 
                                               it != datasetStat.CheckpointStats.end(); it++ ) { 
       CheckpointStatInfo si = *it;
-      mean = si.Mean;
-      sum = si.Sum;
-      stdev = si.StDev;
       if(first) {
-        cout << left << setw(85) << "Checkpoint" << setw(13) << 
-          "Sum" << setw(13) << "Mean" << setw(13) << "StDev" << "%" << endl;
-        cout << left << setw(85) << si.Tag << setw(13) << setprecision(6) << 
-          sum << setw(13) << 
-          mean << setw(13) << stdev << setprecision(1) <<  
-          stdev / mean * 100 << setprecision(6) << endl;
+        cout << left << setw(80) << "Checkpoint" << setw(13) << 
+          "Sum" << setw(13) << "Mean" << setw(13) << "StDev" << setw(13) << "%" <<  "ImgMean" << endl;
+        cout << left << setw(80) << si.Tag << setw(13) << setprecision(6) << 
+          si.Sum << setw(13) << 
+          si.Mean << setw(13) << si.StDev << setprecision(1) <<  setw(13) << 
+          si.StDevPercentage << setw(13) << setprecision(6) << si.Mean / nfiles / iterations << endl;
         first = false;  
       }
       else {
-        cout << left << setw(85) << si.Tag << setw(13) << 
-          sum << setw(13) << 
-          mean << setw(13) <<  stdev << setprecision(1) <<  
-          stdev / mean * 100 << setprecision(6) << endl;
+        cout << left << setw(80) << si.Tag << setw(13) << setprecision(6) << 
+          si.Sum << setw(13) << 
+          si.Mean << setw(13) << si.StDev << setprecision(1) <<  setw(13) << 
+          si.StDevPercentage << setprecision(6) << si.Mean / nfiles / iterations << endl;
       }
     }
      
-//  string Base;
-//  double TotalTime;
-//  double MeanTime;
-//  double StDevTime;
-//  double StDevTimePercentage;
-    
-    cout << left << setw(85) << "Total dataset time" << setw(13) << 
+    cout << left << setw(80) << "Total dataset time" << setw(13) << 
       datasetStat.TotalTime << setw(13) << 
-      datasetStat.MeanTime << setw(13) << datasetStat.StDevTime << setprecision(1) <<  
-      datasetStat.StDevTimePercentage << setprecision(6) << endl;
+      datasetStat.MeanTime << setw(13) << datasetStat.StDevTime << setprecision(1) <<  setw(13) << 
+      datasetStat.StDevTimePercentage << setprecision(6) << datasetStat.MeanTime / nfiles / iterations << endl;
     //cout <<  string(125, '-')  <<  endl;
 }
 
