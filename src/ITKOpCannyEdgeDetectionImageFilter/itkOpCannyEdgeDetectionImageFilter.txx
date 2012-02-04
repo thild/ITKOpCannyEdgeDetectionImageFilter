@@ -112,7 +112,7 @@ OpCannyEdgeDetectionImageFilter<TInputImage,TOutputImage>
 ::GenerateInputRequestedRegion() throw(InvalidRequestedRegionError)
 {
   // call the superclass' implementation of this method
-  Superclass::GenerateInputRequestedRegion();
+  Superclass::GenerateInputRequestedRegion();  
   return;  
   // get pointers to the input and output
   typename Superclass::InputImagePointer  inputPtr = 

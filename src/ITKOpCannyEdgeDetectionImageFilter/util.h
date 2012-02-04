@@ -27,6 +27,8 @@
 #ifndef _UTIL_H
 #define _UTIL_H
 
+namespace std {
+
 std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
     std::stringstream ss(s);
     std::string item;
@@ -42,6 +44,15 @@ std::vector<std::string> split(const std::string &s, char delim) {
     return split(s, delim, elems);
 }
 
+template <typename T>
+T& insert_at(T& pContainer, size_t pIndex, const typename T::value_type& pValue)
+{
+    pContainer.insert(pContainer.begin() + pIndex, pValue);
+
+    return pContainer;
+}
+
+
 void populateBuffer(const int imageStride, const int imageWidth, const int imageHeight,
                     float* inputImage) {
     for (int i = 0; i < imageStride * imageHeight; i++) {
@@ -55,6 +66,7 @@ void populateBuffer(const int imageStride, const int imageWidth, const int image
     }
 }
 
+}
 //#define cout sout
 //#include <fstream>
 //#include <iostream>

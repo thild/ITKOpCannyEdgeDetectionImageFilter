@@ -100,10 +100,141 @@ typedef itk::CannyEdgeDetectionImageFilter<RealImageType, RealImageType> CannyFi
 typedef itk::ImageToImageFilter<RealImageType, RealImageType> ImageToImageFilterTest;
 
 
-struct StatisticInfo {
+
+struct ImageStatInfo {
+  public:
+  string Image;
+  double Time;
+  vector <Checkpoint> Checkpoints;
+  ImageStatInfo(string image, double time, vector<Checkpoint>& checkpoints) {
+    Image = image;
+    Time = time;
+    Checkpoints = checkpoints; 
+  }
+};
+
+struct CheckpointStatInfo {
   string Tag;
   double Mean;
+  double Sum;
   double StDev; 
+  double StDevPercentage; 
+};
+
+struct CheckpointInfo {
+  string Tag;
+  vector<double> Times;
+};
+
+struct IterationCheckpointInfo {
+  string Tag;
+  double Time;
+  int Position;
+};
+
+struct IterationStatInfo {
+  public:
+  int Iteration;
+  double Time;
+  map <string, IterationCheckpointInfo> Checkpoints;
+  
+  IterationStatInfo(int iteration, vector <ImageStatInfo>& imageStatInfo) {
+    Iteration = iteration;
+    ProcessImageStat(imageStatInfo);
+  }
+  
+  private:
+  void ProcessImageStat(vector <ImageStatInfo>& imageStatInfo) {
+    map<string, IterationCheckpointInfo> checkpointTimes;
+    double time = 0;
+    for (vector<ImageStatInfo>::iterator it = imageStatInfo.begin(); 
+         it != imageStatInfo.end(); it++) {
+      time += it->Time;
+      for (vector<Checkpoint>::iterator checkpoint = it->Checkpoints.begin(); 
+           checkpoint != it->Checkpoints.end(); checkpoint++) { 
+        IterationCheckpointInfo& cpi = Checkpoints[checkpoint->Tag];     
+        cpi.Tag = checkpoint->Tag;
+        cpi.Time += checkpoint->Elapsed; 
+        cpi.Position = checkpoint->Position; 
+      }
+    } 
+    Time = time;
+  }
+  
+};
+
+struct DatasetStatInfo {
+  public:
+  
+  string Base;
+  double TotalTime;
+  double MeanTime;
+  double StDevTime;
+  double StDevTimePercentage;
+  
+  vector <CheckpointStatInfo> CheckpointStats;
+  
+  
+  DatasetStatInfo(string basee, vector <IterationStatInfo>& iterationStatInfo) {
+    Base = basee;
+    ProcessIterationStat(iterationStatInfo);
+  }
+  
+  private:
+  void ProcessIterationStat(vector <IterationStatInfo>& iterationStatInfo) {
+    vector<double> times;
+    int size = iterationStatInfo[0].Checkpoints.size();
+    CheckpointInfo infos[size]; 
+    map<string, vector<double> > checkpointTimes;
+    for (vector<IterationStatInfo>::iterator it = iterationStatInfo.begin(); 
+         it != iterationStatInfo.end(); it++) {
+      times.push_back (it->Time);
+      for (map <string, IterationCheckpointInfo>::iterator checkpointIt = it->Checkpoints.begin(); 
+           checkpointIt != it->Checkpoints.end(); checkpointIt++) { 
+           infos[checkpointIt->second.Position].Tag = checkpointIt->second.Tag;
+           infos[checkpointIt->second.Position].Times.push_back(checkpointIt->second.Time);
+      } 
+    } 
+    TotalTime = Sum(times);
+    MeanTime = Mean(times);
+    StDevTime = StDev(times);
+    StDevTimePercentage = StDevTime / MeanTime * 100; 
+    for (int i = 0; i < size; ++i) {
+        CheckpointInfo& cpi = infos[i];
+        CheckpointStatInfo csi;
+        csi.Tag = cpi.Tag;
+        csi.Mean = Mean(cpi.Times);
+        csi.Sum = Sum(cpi.Times);
+        csi.StDev = StDev(cpi.Times); 
+        csi.StDevPercentage = csi.StDev / csi.Mean * 100;  
+        CheckpointStats.push_back(csi);
+    } 
+//    ProcessCheckpointStat(iterationStatInfo.Checkpoints);
+  }
+    
+//  
+//  void ProcessCheckpointStat(vector<Checkpoint>& checkpoints) {
+//    map<string, vector<double> > checkpointTimes = ProcessCheckpoints(checkpoints);
+//    map<string, CheckpointStatInfo> stat;
+//    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
+//                                                it != checkpointTimes.end(); 
+//                                                it++ ) { 
+//      stat[it->first].Mean = Mean(it->second);
+//      stat[it->first].StDev = StDev(it->second);
+//      stat[it->first].Sum = Sum(it->second);
+//    }
+//    return stat;
+//  }
+//  
+//  void map<string, vector<double> > ProcessCheckpoints(vector<Checkpoint>& checkpoints) {
+//    map<string, vector<double> > checkPointTimes;
+//    for (vector<Checkpoint>::iterator it = checkpoints.begin(); 
+//         it != checkpoints.end(); it++) {
+//       checkPointTimes[it->Tag].push_back(it->Elapsed);
+//    } 
+//    return checkPointTimes;
+//  }
+//    
 };
 
 //struct ConformanceInfo {
@@ -122,47 +253,66 @@ struct StatisticInfo {
 //     return Width * Height;
 //  }
 //};
-
-struct CheckpointStatistics {
-  public:
-  
-  static map<string, StatisticInfo> GetStatistics(vector<Checkpoint>& checkpoints) {
-    map<string, vector<double> > checkpointTimes = ProcessCheckpoints(checkpoints);
-    map<string, StatisticInfo> stat;
-    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
-                                                it != checkpointTimes.end(); 
-                                                it++ ) { 
-      stat[it->first].Mean = Mean(it->second);
-      stat[it->first].StDev = StDev(it->second);
-    }
-    return stat;
-  }
-  
-  private:
-  
-  static map<string, vector<double> > ProcessCheckpoints(vector<Checkpoint>& checkpoints) {
-    map<string, vector<double> > checkPointTimes;
-    for (vector<Checkpoint>::iterator it = checkpoints.begin(); 
-         it != checkpoints.end(); it++) {
-       checkPointTimes[it->Tag].push_back(it->Elapsed);
-    } 
-    return checkPointTimes;
-  }
-  
-  CheckpointStatistics()  {  }
-};
+//
+//struct CheckpointStatistics {
+//  public:
+//  
+//  static map<string, CheckpointStatInfo> GetStatistics(vector<Checkpoint>& checkpoints) {
+//    map<string, vector<double> > checkpointTimes = ProcessCheckpoints(checkpoints);
+//    map<string, CheckpointStatInfo> stat;    int Position;
+//    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
+//                                                it != checkpointTimes.end(); 
+//                                                it++ ) { 
+//      stat[it->first].Mean = Mean(it->second);
+//      stat[it->first].StDev = StDev(it->second);
+//      stat[it->first].Sum = Sum(it->second);
+//    }
+//    return stat;
+//  }
+//  
+//  static map<string, CheckpointStatInfo> GetStatistics(vector< vector<Checkpoint> >& checkpointsPerImage) {
+//   
+//    map<string, vector<double> > checkpointTimes;
+//    for (vector< vector<Checkpoint> >::iterator it = checkpointsPerImage.begin(); 
+//         it != checkpointsPerImage.end(); it++) {
+//      for (vector<Checkpoint>::iterator vecit = it->begin(); 
+//           vecit != it->end(); vecit++) {
+//        checkpointTimes[vecit->Tag].push_back(vecit->Elapsed);
+//      }
+//    } 
+//    map<string, CheckpointStatInfo> stat;
+//    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
+//                                                it != checkpointTimes.end(); 
+//                                                it++ ) { 
+//      stat[it->first].Mean = Mean(it->second);
+//      stat[it->first].StDev = StDev(it->second);
+//      stat[it->first].Sum = Sum(it->second);
+//    }
+//    return stat;
+//  }
+//  
+//  private:
+//  
+//  static map<string, vector<double> > ProcessCheckpoints(vector<Checkpoint>& checkpoints) {
+//    map<string, vector<double> > checkPointTimes;
+//    for (vector<Checkpoint>::iterator it = checkpoints.begin(); 
+//         it != checkpoints.end(); it++) {
+//       checkPointTimes[it->Tag].push_back(it->Elapsed);
+//    } 
+//    return checkPointTimes;
+//  }
+//  
+//  CheckpointStatistics()  {  }
+//};
 
 void TestDataset(string alg, string datasetsPath, string dataSet, int iterations, bool testIO, double variance, double upperThreshold, double lowerThreshold) {
     fs::path current_dir(datasetsPath + dataSet); 
-    vector<Checkpoint> checkpoints;
     int nfiles = 0;
     StopWatch swTotal; 
-    vector <double> readerStat;
-    vector <double> writerStat;
-    vector <double> filterStat;
-    vector <double> ioStat;
     swTotal.Start();
+    vector<IterationStatInfo> iterationStats;
     for (int i = 0; i < iterations; ++i) { 
+      vector<ImageStatInfo> imageStats;
       try { 
         fs::directory_iterator it(current_dir), eod;
         foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
@@ -191,20 +341,20 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
               filter->SetLowerThreshold( lowerThreshold );
             }
             cannyFilter->SetInput( toReal->GetOutput() );
-            StopWatch swFilter; 
+            StopWatch swImage; 
             StopWatchPool::GetStopWatch(alg)->Reset();
             StopWatchPool::GetStopWatch(alg)->StartNew();
-            swFilter.Start();
+            swImage.Start();
             cannyFilter->Update();
-            swFilter.Stop();
-            filterStat.push_back(swFilter.GetElapsedTime());
+            swImage.Stop();
             vector<Checkpoint> result = 
               StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
-            checkpoints.insert (checkpoints.end(), result.begin(), result.end());
-            cannyFilter->Modified();   
+              ImageStatInfo a(p.string(), swImage.GetElapsedTime(), result);
+            imageStats.push_back(a);  
           }
         }
-      }    
+        iterationStats.push_back(IterationStatInfo(i, imageStats));
+      }     
       catch( itk::ExceptionObject & err ) 
       { 
         std::cout << "ExceptionObject caught !" << std::endl; 
@@ -212,8 +362,10 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
         throw err;
       } 
     }
-    swTotal.Stop(); 
+    swTotal.Stop();  
+    DatasetStatInfo datasetStat(dataSet, iterationStats);
     
+    cout << swTotal.GetElapsedTime() << endl;
     //cout << string(125, '-') << endl;
     cout << left << alg << endl << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
         iterations << " iterations - ";
@@ -232,68 +384,75 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     }
     //cout << string(125, '-') << endl;
 
-    map<string, StatisticInfo> info = CheckpointStatistics::GetStatistics(checkpoints); 
+//    map<string, CheckpointStatInfo> info = CheckpointStatistics::GetStatistics(checkpoints); 
     
     bool first = true;
     double mean = 0;
+    double sum = 0;
     double stdev = 0;
     
-    StatisticInfo ord[6];
+//    CheckpointStatInfo ord[6];
+//    
+//    for (map<string, CheckpointStatInfo>::iterator it = info.begin(); it != info.end(); it++ ) { 
+//      if (it->first == "GaussianBlur") {
+//        it->second.Tag = "GaussianBlur";
+//        ord[0] = it->second; 
+//      }
+//      else if (it->first == "Compute2ndDerivative") {
+//        it->second.Tag = "Compute2ndDerivative";
+//        ord[1] = it->second; 
+//      }
+//      else if (it->first == "Compute2ndDerivativePos") {
+//        it->second.Tag = "Compute2ndDerivativePos";
+//        ord[2] = it->second; 
+//      }
+//      else if (it->first == "ZeroCrossing") {
+//        it->second.Tag = "ZeroCrossing";
+//        ord[3] = it->second; 
+//      }
+//      else if (it->first == "Multiply") {
+//        it->second.Tag = "Multiply";
+//        ord[4] = it->second; 
+//      }
+//      else if (it->first == "HysteresisThresholding") {
+//        it->second.Tag = "HysteresisThresholding";
+//        ord[5] = it->second; 
+//      }
+//    }
     
-    for (map<string, StatisticInfo>::iterator it = info.begin(); it != info.end(); it++ ) { 
-      if (it->first == "GaussianBlur") {
-        it->second.Tag = "GaussianBlur";
-        ord[0] = it->second; 
-      }
-      else if (it->first == "Compute2ndDerivative") {
-        it->second.Tag = "Compute2ndDerivative";
-        ord[1] = it->second; 
-      }
-      else if (it->first == "Compute2ndDerivativePos") {
-        it->second.Tag = "Compute2ndDerivativePos";
-        ord[2] = it->second; 
-      }
-      else if (it->first == "ZeroCrossing") {
-        it->second.Tag = "ZeroCrossing";
-        ord[3] = it->second; 
-      }
-      else if (it->first == "Multiply") {
-        it->second.Tag = "Multiply";
-        ord[4] = it->second; 
-      }
-      else if (it->first == "HysteresisThresholding") {
-        it->second.Tag = "HysteresisThresholding";
-        ord[5] = it->second; 
-      }
-    }
-    
-    
-    for ( int i = 0; i < 6; ++i ) {
-      StatisticInfo si = ord[i];
+    for (vector<CheckpointStatInfo>::iterator it = datasetStat.CheckpointStats.begin(); 
+                                              it != datasetStat.CheckpointStats.end(); it++ ) { 
+      CheckpointStatInfo si = *it;
       mean = si.Mean;
+      sum = si.Sum;
       stdev = si.StDev;
       if(first) {
         cout << left << setw(85) << "Checkpoint" << setw(13) << 
-          "Mean" << setw(13) << "StDev" << "%" << endl;
-        cout << left << setw(85) << si.Tag << setw(13) << setprecision(6) << mean << setw(13) << 
-          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(6) << endl;
+          "Sum" << setw(13) << "Mean" << setw(13) << "StDev" << "%" << endl;
+        cout << left << setw(85) << si.Tag << setw(13) << setprecision(6) << 
+          sum << setw(13) << 
+          mean << setw(13) << stdev << setprecision(1) <<  
+          stdev / mean * 100 << setprecision(6) << endl;
         first = false;  
       }
       else {
-        cout << left << setw(85) << si.Tag << setw(13) << mean << setw(13) << 
-          stdev << setprecision(1) <<  stdev / mean * 100 << setprecision(6) << endl;
+        cout << left << setw(85) << si.Tag << setw(13) << 
+          sum << setw(13) << 
+          mean << setw(13) <<  stdev << setprecision(1) <<  
+          stdev / mean * 100 << setprecision(6) << endl;
       }
     }
+     
+//  string Base;
+//  double TotalTime;
+//  double MeanTime;
+//  double StDevTime;
+//  double StDevTimePercentage;
     
-    //cout << string(125, '-') << endl;
-    mean = Mean(filterStat);
-    stdev = StDev(filterStat);
-    cout << left << setw(85) << "Total filter time" << setw(13) << 
-      mean << setw(13) << stdev << setprecision(1) <<  
-      stdev / mean * 100 << setprecision(6) << endl;
-    //cout << string(125, '-') << endl;
-    cout << left << setw(85) << "Total dataset test time";
-    cout << left << mean * nfiles << endl;
+    cout << left << setw(85) << "Total dataset time" << setw(13) << 
+      datasetStat.TotalTime << setw(13) << 
+      datasetStat.MeanTime << setw(13) << datasetStat.StDevTime << setprecision(1) <<  
+      datasetStat.StDevTimePercentage << setprecision(6) << endl;
     //cout <<  string(125, '-')  <<  endl;
 }
 

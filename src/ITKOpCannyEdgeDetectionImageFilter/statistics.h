@@ -46,6 +46,17 @@ double Mean(const vector<T>& arr)
 }
 
 template <typename T>
+double Sum(const vector<T>& arr)
+{
+    T sum = 0;
+    for (size_t idx = 0; idx < arr.size(); idx++)
+    {
+        sum += arr[idx];
+    }
+    return sum;
+}
+
+template <typename T>
 double StDev(const vector<T>& arr)
 {
     double mean = Mean(arr);
