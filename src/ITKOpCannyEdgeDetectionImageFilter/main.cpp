@@ -63,6 +63,9 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include "boost/date_time/gregorian/gregorian.hpp"
+#include "boost/date_time/posix_time/posix_time.hpp"
+  
 #include <valgrind/callgrind.h>
 
 #define foreach BOOST_FOREACH
@@ -209,103 +212,38 @@ struct DatasetStatInfo {
         csi.StDevPercentage = csi.StDev / csi.Mean * 100;  
         CheckpointStats.push_back(csi);
     } 
-//    ProcessCheckpointStat(iterationStatInfo.Checkpoints);
   }
-    
-//  
-//  void ProcessCheckpointStat(vector<Checkpoint>& checkpoints) {
-//    map<string, vector<double> > checkpointTimes = ProcessCheckpoints(checkpoints);
-//    map<string, CheckpointStatInfo> stat;
-//    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
-//                                                it != checkpointTimes.end(); 
-//                                                it++ ) { 
-//      stat[it->first].Mean = Mean(it->second);
-//      stat[it->first].StDev = StDev(it->second);
-//      stat[it->first].Sum = Sum(it->second);
-//    }
-//    return stat;
-//  }
-//  
-//  void map<string, vector<double> > ProcessCheckpoints(vector<Checkpoint>& checkpoints) {
-//    map<string, vector<double> > checkPointTimes;
-//    for (vector<Checkpoint>::iterator it = checkpoints.begin(); 
-//         it != checkpoints.end(); it++) {
-//       checkPointTimes[it->Tag].push_back(it->Elapsed);
-//    } 
-//    return checkPointTimes;
-//  }
-//    
 };
 
-//struct ConformanceInfo {
-//  public:
-//  ConformanceInfo() : Width(0), Height(0), CorrectlyDetect(0) {}
-//  int Width;
-//  int Height; 
-//  string Image;
-//  long NoDetected;
-//  long ErroneouslyDetected;
-//  long CorrectlyDetect;
-//  double GetNotMatchPercentage() {
-//     return (double)NotMatchPixels / (double)GetNumberOfPixels();
-//  }
-//  long GetNumberOfPixels() {
-//     return Width * Height;
-//  }
-//};
-//
-//struct CheckpointStatistics {
-//  public:
-//  
-//  static map<string, CheckpointStatInfo> GetStatistics(vector<Checkpoint>& checkpoints) {
-//    map<string, vector<double> > checkpointTimes = ProcessCheckpoints(checkpoints);
-//    map<string, CheckpointStatInfo> stat;    int Position;
-//    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
-//                                                it != checkpointTimes.end(); 
-//                                                it++ ) { 
-//      stat[it->first].Mean = Mean(it->second);
-//      stat[it->first].StDev = StDev(it->second);
-//      stat[it->first].Sum = Sum(it->second);
-//    }
-//    return stat;
-//  }
-//  
-//  static map<string, CheckpointStatInfo> GetStatistics(vector< vector<Checkpoint> >& checkpointsPerImage) {
-//   
-//    map<string, vector<double> > checkpointTimes;
-//    for (vector< vector<Checkpoint> >::iterator it = checkpointsPerImage.begin(); 
-//         it != checkpointsPerImage.end(); it++) {
-//      for (vector<Checkpoint>::iterator vecit = it->begin(); 
-//           vecit != it->end(); vecit++) {
-//        checkpointTimes[vecit->Tag].push_back(vecit->Elapsed);
-//      }
-//    } 
-//    map<string, CheckpointStatInfo> stat;
-//    for ( map<string, vector<double> >::iterator it = checkpointTimes.begin(); 
-//                                                it != checkpointTimes.end(); 
-//                                                it++ ) { 
-//      stat[it->first].Mean = Mean(it->second);
-//      stat[it->first].StDev = StDev(it->second);
-//      stat[it->first].Sum = Sum(it->second);
-//    }
-//    return stat;
-//  }
-//  
-//  private:
-//  
-//  static map<string, vector<double> > ProcessCheckpoints(vector<Checkpoint>& checkpoints) {
-//    map<string, vector<double> > checkPointTimes;
-//    for (vector<Checkpoint>::iterator it = checkpoints.begin(); 
-//         it != checkpoints.end(); it++) {
-//       checkPointTimes[it->Tag].push_back(it->Elapsed);
-//    } 
-//    return checkPointTimes;
-//  }
-//  
-//  CheckpointStatistics()  {  }
-//};
 
 void TestDataset(string alg, string datasetsPath, string dataSet, int iterations, bool testIO, double variance, double upperThreshold, double lowerThreshold) {
+
+  ofstream log;
+  log.setf(ios::fixed,ios::floatfield); 
+  try { 
+  
+    std::ostringstream dtime;
+    boost::posix_time::ptime now =
+        boost::posix_time::second_clock::local_time();
+    boost::posix_time::time_facet*const f=
+        new boost::posix_time::time_facet();
+    f->set_iso_format();
+    dtime.imbue(std::locale(dtime.getloc(),f));
+    dtime << "canny-" << now  << ".log";
+    
+    string filename = dtime.str();
+    
+    log.open (filename.c_str(), std::ios::out);
+
+    now = boost::posix_time::second_clock::local_time();
+    f->set_iso_extended_format();
+    dtime.str( std::string() ); dtime.clear();
+    dtime.imbue(std::locale(dtime.getloc(),f));
+    dtime << now;
+     
+    log << dataSet << " dataset test initiated at " << dtime.str() << endl;
+    log << "time," << "iteration," << "filepath," << "fileidx," << "checkpoint," << "time" << endl;
+  
     fs::path current_dir(datasetsPath + dataSet); 
     int nfiles = 0;
     StopWatch swTotal; 
@@ -313,61 +251,80 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
     vector<IterationStatInfo> iterationStats;
     for (int i = 0; i < iterations; ++i) { 
       vector<ImageStatInfo> imageStats;
-      try { 
-        fs::directory_iterator it(current_dir), eod;
-        foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
-//          sleep(0.0016);
-          if (is_regular_file(p)) { 
-            ++nfiles;
-            ReaderType::Pointer reader = ReaderType::New();
-            reader->SetFileName(p.string());
-            reader->Update();
-            CastToRealFilterType::Pointer toReal = CastToRealFilterType::New();  
-            toReal->SetInput( reader->GetOutput() );
-            toReal->Update();
-            ImageToImageFilterTest::Pointer cannyFilter;
-            if(alg == "OpCannyEdgeDetectionImageFilter") {
-              cannyFilter = OpCannyFilter::New();
-              OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
-              filter->SetVariance( variance );
-              filter->SetUpperThreshold( upperThreshold );
-              filter->SetLowerThreshold( lowerThreshold );
-            }
-            else {
-              cannyFilter = CannyFilter::New();
-              CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
-              filter->SetVariance( variance );
-              filter->SetUpperThreshold( upperThreshold );
-              filter->SetLowerThreshold( lowerThreshold );
-            }
-            cannyFilter->SetInput( toReal->GetOutput() );
-            StopWatch swImage; 
-            StopWatchPool::GetStopWatch(alg)->Reset();
-            StopWatchPool::GetStopWatch(alg)->StartNew();
-            swImage.Start();
-            cannyFilter->Update();
-            swImage.Stop();
-            vector<Checkpoint> result = 
-              StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
-              ImageStatInfo a(p.string(), swImage.GetElapsedTime(), result);
-            imageStats.push_back(a);  
+      fs::directory_iterator it(current_dir), eod;
+      int j = 1;
+      foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
+        if (is_regular_file(p)) { 
+          ++nfiles;
+          
+          ReaderType::Pointer reader = ReaderType::New();
+          reader->SetFileName(p.string());
+          reader->Update();
+          CastToRealFilterType::Pointer toReal = CastToRealFilterType::New();  
+          toReal->SetInput( reader->GetOutput() );
+          toReal->Update();
+          ImageToImageFilterTest::Pointer cannyFilter;
+          if(alg == "OpCannyEdgeDetectionImageFilter") {
+            cannyFilter = OpCannyFilter::New();
+            OpCannyFilter::Pointer filter = static_cast<OpCannyFilter*>(cannyFilter.GetPointer());
+            filter->SetVariance( variance );
+            filter->SetUpperThreshold( upperThreshold );
+            filter->SetLowerThreshold( lowerThreshold );
           }
+          else {
+            cannyFilter = CannyFilter::New();
+            CannyFilter::Pointer filter = static_cast<CannyFilter*>(cannyFilter.GetPointer());
+            filter->SetVariance( variance );
+            filter->SetUpperThreshold( upperThreshold );
+            filter->SetLowerThreshold( lowerThreshold );
+          }
+          cannyFilter->SetInput( toReal->GetOutput() );
+          StopWatch swImage; 
+          StopWatchPool::GetStopWatch(alg)->Reset();
+          StopWatchPool::GetStopWatch(alg)->StartNew();
+          swImage.Start();
+          cannyFilter->Update();
+          swImage.Stop();
+          vector<Checkpoint> result = 
+            StopWatchPool::GetStopWatch(alg)->GetNotIgnoredCheckpoints();
+            ImageStatInfo a(p.string(), swImage.GetElapsedTime(), result);
+          imageStats.push_back(a);  
+          
+          std::ostringstream itime;
+          now = boost::posix_time::second_clock::local_time();
+          boost::posix_time::time_facet* const tf=
+              new boost::posix_time::time_facet();
+          tf->format("%H:%M:%S");
+          itime.imbue(std::locale(itime.getloc(),tf));
+          itime << now;
+          
+          for (vector<Checkpoint>::iterator checkpoint = result.begin(); 
+               checkpoint != result.end(); checkpoint++) { 
+            log << setprecision(0) << itime.str() << "," << i + 1 << "," << p.string() << "," << j << "," << checkpoint->Tag << "," << setprecision(6) << checkpoint->Elapsed << endl;
+          }
+          log << setprecision(0) << itime.str() << "," << i + 1<< "," << p.string() << "," << j << "," << "Total" << "," << setprecision(6) << swImage.GetElapsedTime() << endl;
+          
+          ++j;
         }
-        iterationStats.push_back(IterationStatInfo(i, imageStats));
-      }     
-      catch( itk::ExceptionObject & err ) 
-      { 
-        std::cout << "ExceptionObject caught !" << std::endl; 
-        std::cout << err << std::endl; 
-        throw err;
-      } 
-    }
+      }
+      iterationStats.push_back(IterationStatInfo(i, imageStats)); 
+    } 
     swTotal.Stop();  
+    
+    now = boost::posix_time::second_clock::local_time();
+    f->set_iso_extended_format();
+    dtime.str( std::string() ); dtime.clear();
+    dtime.imbue(std::locale(dtime.getloc(),f));
+    dtime << now;
+     
+    log << dataSet << " dataset test terminated at " << dtime.str() << endl;
+    
     DatasetStatInfo datasetStat(dataSet, iterationStats);
     
-    //cout << string(125, '-') << endl;
-    cout << left << alg << " - " << swTotal.GetElapsedTime()  << endl << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
-        iterations << " iterations - ";
+//    cout << left << alg << " - " << swTotal.GetElapsedTime()  << endl << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
+        
+    cout << left << alg << endl;
+        
     if (alg == "OpCannyEdgeDetectionImageFilter" ) {
 #ifdef _OPENMP     
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
@@ -381,6 +338,9 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
       cout << itk::MultiThreader::GetGlobalMaximumNumberOfThreads() << 
         " threads ITK" << endl; 
     }
+
+    cout << left << "Dataset " << dataSet << " - " << nfiles / iterations << " files - " << 
+      iterations << " iterations" << endl;
     
     bool first = true;
     
@@ -388,33 +348,48 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
                                               it != datasetStat.CheckpointStats.end(); it++ ) { 
       CheckpointStatInfo si = *it;
       if(first) {
-        cout << left << setw(80) << "Checkpoint" << setw(13) << 
-          "Sum" << setw(13) << "Mean" << setw(13) << "StDev" << setw(13) << "%" <<  "ImgMean" << endl;
-        cout << left << setw(80) << si.Tag << setw(13) << setprecision(6) << 
-          si.Sum << setw(13) << 
-          si.Mean << setw(13) << si.StDev << setprecision(1) <<  setw(13) << 
-          si.StDevPercentage << setw(13) << setprecision(6) << si.Mean / (nfiles / iterations) << endl;
+        cout << left << setw(60) << "Checkpoint" << setw(15) << 
+          "Mean" << setw(15) << "StDev" << setw(15) << "%" <<  setw(15) << "ImgMean" << "TotalDs" << endl;
         first = false;  
       }
-      else {
-        cout << left << setw(80) << si.Tag << setw(13) << setprecision(6) << 
-          si.Sum << setw(13) << 
-          si.Mean << setw(13) << si.StDev << setprecision(1) <<  setw(13) << 
-          si.StDevPercentage << setprecision(6) << si.Mean / (nfiles / iterations) << endl;
-      }
+      cout << left << 
+        setw(60) << si.Tag << 
+        setw(15) << setprecision(6) << si.Mean << 
+        setw(15) << si.StDev << 
+        setw(15) << setprecision(1) <<  si.StDevPercentage << 
+        setw(15) << setprecision(6) << si.Mean / (nfiles / iterations) << 
+        setprecision(6) << si.Sum << endl;
     }
      
-    cout << left << setw(80) << "Total dataset time" << setw(13) << 
-      datasetStat.TotalTime << setw(13) << 
-      datasetStat.MeanTime << setw(13) << datasetStat.StDevTime << setprecision(1) <<  setw(13) << 
-      datasetStat.StDevTimePercentage << setprecision(6) << datasetStat.MeanTime / (nfiles / iterations) << endl;
+    cout << left << 
+      setw(60) << "Total dataset time" << 
+      setw(15)  << setprecision(6) << datasetStat.MeanTime << 
+      setw(15) << datasetStat.StDevTime << 
+      setw(15) << setprecision(1) << datasetStat.StDevTimePercentage << 
+      setw(15) << setprecision(6) << datasetStat.MeanTime / (nfiles / iterations) << 
+      setw(15) << setprecision(6) << datasetStat.TotalTime << endl;
     //cout <<  string(125, '-')  <<  endl;
-}
+    goto finally;
+  }     
+  catch( itk::ExceptionObject & err ) 
+  { 
+    std::cout << "ExceptionObject caught !" << std::endl; 
+    std::cout << err << std::endl; 
+    throw err; 
+    goto finally;
+  } 
+  
+  finally:
+  {
+    log.close();
+  }
+    
+     
+} 
 
 
 int main (int argc, char *argv[])
 {
-// itk::MultiThreader::SetGlobalMaximumNumberOfThreads( 1 );
  cout.setf(ios::fixed);  
  cout.precision(4);
  
@@ -534,8 +509,6 @@ int main (int argc, char *argv[])
       double pfa = 0;
      
       cout << "Running " <<  *ds << " dataset conformance test..." << endl;
-      
-//      map<string, ConformanceInfo> conformanceInfo;
       
       string createPath = "results";
       fs::create_directory(createPath);
