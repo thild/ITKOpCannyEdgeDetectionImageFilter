@@ -196,7 +196,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   sw->AddCheckpoint("Begin Compute2ndDerivative", true);  
   this->Compute2ndDerivative();    
   sw->AddCheckpoint("Compute2ndDerivative");  
-  
+    
   sw->AddCheckpoint("Begin Compute2ndDerivativePos", true);  
   this->Compute2ndDerivativePos();    
   sw->AddCheckpoint("Compute2ndDerivativePos");
@@ -243,6 +243,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   
   float* inputImage  = m_GaussianBuffer->GetBufferPointer(); 
   float* outputImage = this->GetOutput()->GetBufferPointer();
+  //float* outputImage  = m_UpdateBuffer->GetBufferPointer();
 //  printImage(imageWidth, imageHeight, imageStride, inputImage);
   
   Compute2ndDerivative(imageStride, imageWidth, imageHeight, inputImage, outputImage, imageStride);
@@ -313,6 +314,137 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 
 
 
+//// Calculate the second derivative
+//template< class TInputImage, class TOutputImage >
+//void
+//OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
+//::Compute2ndDerivative(const int imageStride, const int imageWidth, 
+//                       const int imageHeight, 
+//                       const float* inputImage, float* outputImage, const int outStride) 
+//{ 
+//    const int kernelWidth = 3;
+//    const int halfKernel = kernelWidth / 2;
+//    
+//    int startX  = 0;
+//    int stopX   = imageWidth - 2 * halfKernel;
+//    int startY  = 0;
+//    int stopY   = imageHeight - 2 * halfKernel;
+//
+//      
+//    #pragma omp parallel for shared (inputImage, outputImage) 
+//    for (int y = startY; y < stopY; ++y) {
+//      const register __m128 kdx0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);        
+//      const register __m128 kdx2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);    
+//      
+//      const register __m128 kdxx0 = _mm_set_ps(1.0, 1.0, 1.0, 1.0);       
+//      const register __m128 kdxx1 = _mm_set_ps(-2.0, -2.0, -2.0, -2.0);   
+//      
+//      for (int x = startX; x < stopX; x += 4) {
+//        __m128 dx_x, dx_y, dxx_x, dxx_y, dxy;
+//        //dxy = _mm_setzero_ps();
+//        
+//        __m128 inv0 = _mm_load_ps(&inputImage[y * imageStride + x]);            
+//        __m128 inv1 = _mm_load_ps(&inputImage[(y + 1) * imageStride + x]);   
+//        __m128 inv2 = _mm_load_ps(&inputImage[(y + 2) * imageStride + x]);   
+//        
+//        register __m128 ktmp = _mm_setzero_ps();                             
+//        
+//        dx_x /*inv0 + 4*/ = _mm_load_ps(&inputImage[y * imageStride + x + 4]);               
+//        dxx_x /*inv2 + 4*/= _mm_load_ps(&inputImage[(y + 2) * imageStride + x + 4]);         
+//        
+//        dx_y /*kdxy0*/ = _mm_set_ps(0.0, -0.25, 0.0, 0.25);    
+//        dxx_y /*kdxy2*/ = _mm_set_ps(0.0, 0.25, 0.0, -0.25);   
+//        
+//        //A
+//        dxy = _mm_dp113_ps(inv0, dx_y);
+//        ROTATE_RIGHT(dx_y);                        
+//        dxy += _mm_dp226_ps(inv0, dx_y);         
+//        ROTATE_RIGHT_BLEND(dx_y, ktmp);                                         
+//        dxy += _mm_dp196_ps(inv0, dx_y) + _mm_dp20_ps(dx_x, ktmp);
+//        ROTATE_RIGHT(ktmp);                                                     
+//        ROTATE_RIGHT_BLEND(dx_y, ktmp);                                         
+//        dxy += _mm_dp136_ps(inv0, dx_y) + _mm_dp56_ps(dx_x, ktmp);                    
+//         
+//        ktmp = _mm_setzero_ps();                                              
+//        dxy += _mm_dp113_ps(inv2, dxx_y);
+//        ROTATE_RIGHT(dxx_y);                                                     
+//        dxy += _mm_dp226_ps(inv2, dxx_y);                                   
+//        ROTATE_RIGHT_BLEND(dxx_y, ktmp);                                         
+//        dxy += _mm_dp196_ps(inv2, dxx_y) + _mm_dp20_ps(dxx_x, ktmp);      
+//        ROTATE_RIGHT(ktmp);                                                     
+//        ROTATE_RIGHT_BLEND(dxx_y, ktmp);                                         
+//        dxy += _mm_dp136_ps(inv2, dxx_y) + _mm_dp56_ps(dxx_x, ktmp);
+//        
+//        //B
+//        ktmp = inv0;
+//        BLEND_ROTATE_LEFT(ktmp, dx_x);
+//        
+//        dx_y = kdx0 * ktmp;                                                   
+//        dxx_y = kdxx0 * ktmp;                                                 
+//        
+//        //C
+//        ktmp = inv1;
+//        dx_x = _mm_load_ps(&inputImage[(y + 1) * imageStride + x + 4]);       
+//        BLEND_ROTATE_LEFT(ktmp, dx_x);
+//        
+//        dxx_y += kdxx1 * ktmp;                                                
+//        
+//        //D
+//        ktmp = inv2;
+//        BLEND_ROTATE_LEFT(ktmp, dxx_x);
+//        dx_y += kdx2 * ktmp;                                                  
+//        dxx_y += kdxx0 * ktmp;                                                
+//        
+//        //E
+//        register __m128 kdx = _mm_set_ps(0.0, 1.0, -2.0, 1.0);                  
+//        ktmp = _mm_setzero_ps();                                                
+//        dxx_x = _mm_dp113_ps(inv1, kdx);                                      
+//        ROTATE_RIGHT(kdx);                                                     
+//        dxx_x += _mm_dp226_ps(inv1, kdx);                                     
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        inv2 = dx_x;                                                            
+//        dxx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv2, ktmp);
+//        ROTATE_RIGHT(ktmp);                                                     
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dxx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv2, ktmp);         
+//        
+//        //F
+//        kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);              
+//        inv2 = dx_x;        PRINT_VECTOR(inv2);
+//        dx_x = _mm_dp113_ps(inv1, kdx);
+//        ROTATE_RIGHT(kdx);                                                     
+//        dx_x += _mm_dp226_ps(inv1, kdx);
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv2, ktmp);
+//        ROTATE_RIGHT(ktmp);                                                     
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv2, ktmp);
+//            
+//        //G
+//        inv0 /*deriv*/ = _mm_set1_ps(2.0) * dx_y * dx_x * dxy;                  
+//        
+//        //H
+//        dx_x = dx_x * dx_x;
+//        dx_y = dx_y * dx_y;
+//        
+//        //I
+//        inv0 += (dx_x * dxx_x) + (dx_y * dxx_y);                                
+//        
+//        //J
+//        inv1 /*gradMag*/ = _mm_set1_ps(0.0001); 
+//        inv1 += dx_x + dx_y;                                                    
+//
+//        //K
+//        inv0 = inv0 / inv1;                                                     
+//        
+//        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], inv0); 
+//        
+//            
+//    }
+//  }
+//}
+
+
 // Calculate the second derivative
 template< class TInputImage, class TOutputImage >
 void
@@ -321,135 +453,74 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
                        const int imageHeight, 
                        const float* inputImage, float* outputImage, const int outStride) 
 { 
-//    return;
-//    typename TInputImage::SizeType regionSize = 
-//        this->GetInput()->GetRequestedRegion().GetSize();
-//          
-//    int imageWidth = regionSize[0];
-//    int imageHeight = regionSize[1];
-// 
-//    float* inputImage  = m_GaussianBuffer->GetBufferPointer(); 
-//    float* outputImage = this->GetOutput()->GetBufferPointer();
-    
-    const int kernelWidth = 3;
+    const int kernelWidth = 3;  
     const int halfKernel = kernelWidth / 2;
-//    const int imageStride = this->GetInput()->GetOffsetTable()[1];
     
     int startX  = 0;
     int stopX   = imageWidth - 2 * halfKernel;
     int startY  = 0;
-    int stopY   = imageHeight - 2 * halfKernel;
-
-      
+    int stopY   = (imageHeight - 2 * halfKernel);
+    
     #pragma omp parallel for shared (inputImage, outputImage) 
     for (int y = startY; y < stopY; ++y) {
-      const register __m128 kdx0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);        
-      const register __m128 kdx2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);    
-      
-      const register __m128 kdxx0 = _mm_set_ps(1.0, 1.0, 1.0, 1.0);       
-      const register __m128 kdxx1 = _mm_set_ps(-2.0, -2.0, -2.0, -2.0);   
-      
-      for (int x = startX; x < stopX; x += 4) {
-        __m128 dx_x, dx_y, dxx_x, dxx_y, dxy;
-        dxy = _mm_setzero_ps();
+      for (int x = startX; x < stopX; x += 4) { 
+        register __m128 dx, dy, dxx, dyy, dxy;
+        register __m128 kv0, kv1, kv2;  
+        const register __m128 kdxy0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25);  
+        const register __m128 kdxy2 = _mm_set_ps(-0.25, -0.25, 0.25, 0.25);  
+        register __m128 iv00, iv01, iv02, iv10, iv11, iv12;    
         
-        __m128 inv0 = _mm_load_ps(&inputImage[y * imageStride + x]);            
-        __m128 inv1 = _mm_load_ps(&inputImage[(y + 1) * imageStride + x]);   
-        __m128 inv2 = _mm_load_ps(&inputImage[(y + 2) * imageStride + x]);   
+        const int y0 = (y + 0) * imageStride + x;
+        const int y1 = (y + 1) * imageStride + x;
+        const int y2 = (y + 2) * imageStride + x;
         
-        register __m128 ktmp = _mm_setzero_ps();                             
+        iv00 = _mm_load_ps(&inputImage[y0]);  
+        iv01 = _mm_load_ps(&inputImage[y1]); 
+        iv02 = _mm_load_ps(&inputImage[y2]);  
+  
+        iv10 = _mm_load_ps(&inputImage[y0 + 4]);  
+        iv11 = _mm_load_ps(&inputImage[y1 + 4]);  
+        iv12 = _mm_load_ps(&inputImage[y2 + 4]);   
         
-        dx_x /*inv0 + 4*/ = _mm_load_ps(&inputImage[y * imageStride + x + 4]);               
-        dxx_x /*inv2 + 4*/= _mm_load_ps(&inputImage[(y + 2) * imageStride + x + 4]);         
+        //dx        
+        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+        dx = _mm_dpil_ps(iv01, kv0);
+        //dxx
+        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+        dxx = _mm_dp113_ps(iv01, kv0); 
+        //dxy
+        dxy = _mm_vdpil_ps(iv00, kdxy0, iv02, kdxy2);
         
-        dx_y /*kdxy0*/ = _mm_set_ps(0.0, -0.25, 0.0, 0.25);    
-        dxx_y /*kdxy2*/ = _mm_set_ps(0.0, 0.25, 0.0, -0.25);   
+        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
         
-        //A
-        dxy = _mm_dp113_ps(inv0, dx_y);
-        ROTATE_RIGHT(dx_y);                        
-        dxy += _mm_dp226_ps(inv0, dx_y);         
-        ROTATE_RIGHT_BLEND(dx_y, ktmp);                                         
-        dxy += _mm_dp196_ps(inv0, dx_y) + _mm_dp20_ps(dx_x, ktmp);
-        ROTATE_RIGHT(ktmp);                                                     
-        ROTATE_RIGHT_BLEND(dx_y, ktmp);                                         
-        dxy += _mm_dp136_ps(inv0, dx_y) + _mm_dp56_ps(dx_x, ktmp);                    
-         
-        ktmp = _mm_setzero_ps();                                              
-        dxy += _mm_dp113_ps(inv2, dxx_y);
-        ROTATE_RIGHT(dxx_y);                                                     
-        dxy += _mm_dp226_ps(inv2, dxx_y);                                   
-        ROTATE_RIGHT_BLEND(dxx_y, ktmp);                                         
-        dxy += _mm_dp196_ps(inv2, dxx_y) + _mm_dp20_ps(dxx_x, ktmp);      
-        ROTATE_RIGHT(ktmp);                                                     
-        ROTATE_RIGHT_BLEND(dxx_y, ktmp);                                         
-        dxy += _mm_dp136_ps(inv2, dxx_y) + _mm_dp56_ps(dxx_x, ktmp);
+        //dy
+        kv0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);  
+        kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);   
+        dy = _mm_v2dp_ps(iv00, kv0, iv02, kv2);
+        //dyy
+        kv1 = _mm_set_ps(-2.0, -2.0, -2.0, -2.0);  
+        dyy = _mm_v3mdp_ps(iv00, iv01, iv02, kv1);
+        //dxx
+        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+        dxx += _mm_dp114_ps(iv01, kv0); 
+  
+        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+        //dx        
+        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+        dx += _mm_dpih_ps(iv01, kv0);  
+        //dxx
+        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+        dxx += _mm_dp116_ps(iv01, kv0); 
+        //dxy
+        dxy += _mm_vdpih_ps(iv00, kdxy0, iv02, kdxy2);
         
-        //B
-        ktmp = inv0;
-        BLEND_ROTATE_LEFT(ktmp, dx_x);
-        
-        dx_y = kdx0 * ktmp;                                                   
-        dxx_y = kdxx0 * ktmp;                                                 
-        
-        //C
-        ktmp = inv1;
-        dx_x = _mm_load_ps(&inputImage[(y + 1) * imageStride + x + 4]);       
-        BLEND_ROTATE_LEFT(ktmp, dx_x);
-        
-        dxx_y += kdxx1 * ktmp;                                                
-        
-        //D
-        ktmp = inv2;
-        BLEND_ROTATE_LEFT(ktmp, dxx_x);
-        dx_y += kdx2 * ktmp;                                                  
-        dxx_y += kdxx0 * ktmp;                                                
-        
-        //E
-        register __m128 kdx = _mm_set_ps(0.0, 1.0, -2.0, 1.0);                  
-        ktmp = _mm_setzero_ps();                                                
-        dxx_x = _mm_dp113_ps(inv1, kdx);                                      
-        ROTATE_RIGHT(kdx);                                                     
-        dxx_x += _mm_dp226_ps(inv1, kdx);                                     
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        inv2 = dx_x;                                                            
-        dxx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv2, ktmp);
-        ROTATE_RIGHT(ktmp);                                                     
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dxx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv2, ktmp);         
-        
-        //F
-        kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);              
-        inv2 = dx_x;        PRINT_VECTOR(inv2);
-        dx_x = _mm_dp113_ps(inv1, kdx);
-        ROTATE_RIGHT(kdx);                                                     
-        dx_x += _mm_dp226_ps(inv1, kdx);
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv2, ktmp);
-        ROTATE_RIGHT(ktmp);                                                     
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv2, ktmp);
-            
-        //G
-        inv0 /*deriv*/ = _mm_set1_ps(2.0) * dx_y * dx_x * dxy;                  
-        
-        //H
-        dx_x = dx_x * dx_x;
-        dx_y = dx_y * dx_y;
-        
-        //I
-        inv0 += (dx_x * dxx_x) + (dx_y * dxx_y);                                
-        
-        //J
-        inv1 /*gradMag*/ = _mm_set1_ps(0.0001); 
-        inv1 += dx_x + dx_y;                                                    
-
-        //K
-        inv0 = inv0 / inv1;                                                     
-        
-        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], inv0); 
-        
-            
+        BLEND_ROTATE1_LEFT(iv01, iv11)
+        //dxx
+        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+        dxx += _mm_dp120_ps(iv01, kv0); 
+        //calc
+        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], 
+                      _mm_lvv_ps(dx, dy, dxx, dyy, dxy));  
     }
   }
 }
@@ -482,13 +553,6 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   float* bGaussianInput = m_BoundaryBuffer1->GetBufferPointer();  
   float* bDxInput = m_BoundaryBuffer2->GetBufferPointer(); 
   
-    
-//void copy2DBoundaryChunk(const float* inBuffer, float* outBuffer,
-//                           const int outStride, const int outWidth, const int outHeight, 
-//                           const int replicateLeft, const int replicateTop,
-//                           const int replicateRight, const int replicateBottom,
-//                           const int inStride,  const int inWidth, const int inHeight);        
-  //left boundaries
   
   int stride = calculateAlignedStride (6, sizeof(InputImagePixelType), 16 ); 
   
@@ -568,14 +632,14 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 //  printImage(imageWidth, imageHeight, imageStride, outputImage);
 }
 
- 
+  
  
 template< class TInputImage, class TOutputImage >
 void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 ::Compute2ndDerivativePos(const int imageStride, const int imageWidth, 
                        const int imageHeight, 
-                       const float* gaussianInput, const float* dxInput,
+                       const float* lvInput, const float* lvvInput,
                        float* outputImage, const int outStride)
 {
 
@@ -588,179 +652,181 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     int stopY   = imageHeight - 2 * halfKernel;
 
       
-    #pragma omp parallel for shared (gaussianInput, dxInput, outputImage) 
+    #pragma omp parallel for shared (lvInput, lvvInput, outputImage) 
     for (int y = startY; y < stopY; ++y) {
-      const register __m128 kdx0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);              
-      const register __m128 kdx2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);          
-      
-      for (int x = startX; x < stopX; x += 4) {
+      for (int x = startX; x < stopX; x += 4) { 
+        register __m128 lx, ly, lvvx, lvvy, lv;
+        const register __m128 kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+        const register __m128 kv1 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);
+        const register __m128 kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);
+        __m128 iv00, iv01, iv02, iv10, iv11, iv12;   
         
-        __m128 dx2dx_x, dx2dx_y, dxg_x, dxg_y;
+        const int y0 = (y + 0) * imageStride + x;
+        const int y1 = (y + 1) * imageStride + x;
+        const int y2 = (y + 2) * imageStride + x;
         
-        __m128 inv0 = _mm_load_ps(&dxInput[y * imageStride + x]);            
-        __m128 inv1 = _mm_load_ps(&dxInput[(y + 1) * imageStride + x]);      
-        __m128 inv2 = _mm_load_ps(&dxInput[(y + 2) * imageStride + x]);      
+        iv00 = _mm_load_ps(&lvInput[y0]); //_mm_prefetch(&lvInput[y0] + 128, _MM_HINT_T0);
+        iv01 = _mm_load_ps(&lvInput[y1]); //_mm_prefetch(&lvInput[y1] + 128, _MM_HINT_T0);                                                   
+        iv02 = _mm_load_ps(&lvInput[y2]); //_mm_prefetch(&lvInput[y2] + 128, _MM_HINT_T0);                                                        
         
-        __m128 inv0_4 = _mm_load_ps(&dxInput[y * imageStride + x + 4]);      
-        __m128 inv1_4 = _mm_load_ps(&dxInput[(y + 1) * imageStride + x + 4]);
-        __m128 inv2_4 = _mm_load_ps(&dxInput[(y + 2) * imageStride + x + 4]);
+        iv10 = _mm_load_ps(&lvInput[y0 + 4]);
+        iv11 = _mm_load_ps(&lvInput[y1 + 4]);
+        iv12 = _mm_load_ps(&lvInput[y2 + 4]);
         
-        register __m128 ktmp;
+        //lx
+        lx = _mm_dpil_ps(iv01, kv0);   
+        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+        //ly
+        ly = _mm_v2dp_ps(iv00, kv1, iv02, kv2); 
         
-        ktmp = inv0;
-        BLEND_ROTATE_LEFT(ktmp, inv0_4);
-        dx2dx_y = kdx0 * ktmp;                                                  
+        BLEND_ROTATE1_LEFT(iv01, iv11)
+        lx += _mm_dpih_ps(iv01, kv0);   
         
-        ktmp = inv2;
-        BLEND_ROTATE_LEFT(ktmp, inv2_4);
-        dx2dx_y += kdx2 * ktmp; 
-        
-        register __m128 kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);
-        ktmp = _mm_setzero_ps();
-        dx2dx_x = _mm_dp113_ps(inv1, kdx);
-        ROTATE_RIGHT(kdx);                                                     
-        dx2dx_x += _mm_dp226_ps(inv1, kdx);
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx2dx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv1_4, ktmp);
-        ROTATE_RIGHT(ktmp);                                                     
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dx2dx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv1_4, ktmp);
+        iv00 = _mm_load_ps(&lvvInput[y0]); //_mm_prefetch(&lvvInput[y0] + 128, _MM_HINT_T0);                                                   
+        iv01 = _mm_load_ps(&lvvInput[y1]); //_mm_prefetch(&lvvInput[y1] + 128, _MM_HINT_T0);                                                    
+        iv02 = _mm_load_ps(&lvvInput[y2]); //_mm_prefetch(&lvvInput[y2] + 128, _MM_HINT_T0);       
+                                                          
+        iv10 = _mm_load_ps(&lvvInput[y0 + 4]);                                                    
+        iv11 = _mm_load_ps(&lvvInput[y1 + 4]);                                                    
+        iv12 = _mm_load_ps(&lvvInput[y2 + 4]);                                                        
+        //Lvvx                                  
+        lvvx = _mm_dpil_ps(iv01, kv0);                                                                         
+        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12) 
+        //Lvvy                                                                                                
+        lvvy = _mm_v2dp_ps(iv00, kv1, iv02, kv2); 
 
-        inv0 = _mm_load_ps(&gaussianInput[y * imageStride + x]);            
-        inv1 = _mm_load_ps(&gaussianInput[(y + 1) * imageStride + x]);      
-        inv2 = _mm_load_ps(&gaussianInput[(y + 2) * imageStride + x]);      
-        
-        inv0_4 = _mm_load_ps(&gaussianInput[y * imageStride + x + 4]);      
-        inv1_4 = _mm_load_ps(&gaussianInput[(y + 1) * imageStride + x + 4]);
-        inv2_4 = _mm_load_ps(&gaussianInput[(y + 2) * imageStride + x + 4]);
-                                                            
-        ktmp = _mm_setzero_ps();
-        
-        ktmp = inv0;
-        BLEND_ROTATE_LEFT(ktmp, inv0_4);
-        dxg_y = kdx0 * ktmp;
-        
-        ktmp = inv2;
-        BLEND_ROTATE_LEFT(ktmp, inv2_4);
-        dxg_y += kdx2 * ktmp;
-        
-        kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);
-        ktmp = _mm_setzero_ps();
-        dxg_x = _mm_dp113_ps(inv1, kdx);
-        ROTATE_RIGHT(kdx);                                                     
-        dxg_x += _mm_dp226_ps(inv1, kdx);
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dxg_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv1_4, ktmp);
-        ROTATE_RIGHT(ktmp);                                                     
-        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
-        dxg_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv1_4, ktmp);
- 
-        register __m128 gradMag = _mm_set1_ps(0.0001);
-        register __m128 derivPos = _mm_setzero_ps();
+        BLEND_ROTATE1_LEFT(iv01, iv11) 
+        //lvvx
+        lvvx += _mm_dpih_ps(iv01, kv0);                                                                        
+                
+        PRINT_VECTOR_TRACE(ly);
+        PRINT_VECTOR_TRACE(lx);
+        PRINT_VECTOR_TRACE(lvvy);
+        PRINT_VECTOR_TRACE(lvvx);
+
+                                                                                                                                                                                                                            
+        iv00 = lx * lx; 
+        iv01 = ly * ly;
+        lv = iv00 + iv01;
+        lv = _mm_sqrt_ps (lv);
+        iv00 = lvvx * (lx / lv);
+        iv00 += lvvy * (ly / lv);
+        iv00 = _mm_cmple_ps(iv00,  _mm_setzero_ps());
+        iv00 = _mm_and_ps(iv00, _mm_set1_ps(0x00000001));
+        iv00 *= lv;                                     
          
-        gradMag += dxg_x * dxg_x;
-        gradMag += dxg_y * dxg_y;
-        
-        gradMag = _mm_sqrt_ps (gradMag);
-        
-        //calculate gradient of 2nd derivative
-        derivPos = dx2dx_x * (dxg_x / gradMag /*calculate the directional derivative*/); 
-        derivPos += dx2dx_y * (dxg_y / gradMag);
-        derivPos = _mm_cmple_ps(derivPos,  _mm_setzero_ps());
-        static const __m128 one = _mm_set1_ps(0x00000001);
-        derivPos = _mm_and_ps(derivPos, one);
-        derivPos = derivPos * gradMag;
-        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], derivPos); 
+        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], iv00);  
     }
   }
 }
 
-
-
 //
-//// Calculate the second derivative
+// 
 //template< class TInputImage, class TOutputImage >
 //void
 //OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
-//::ZeroCrossing() 
+//::Compute2ndDerivativePos(const int imageStride, const int imageWidth, 
+//                       const int imageHeight, 
+//                       const float* gaussianInput, const float* dxInput,
+//                       float* outputImage, const int outStride)
 //{
-////    return;
-//  typename TInputImage::SizeType regionSize = 
-//  this->GetInput()->GetRequestedRegion().GetSize();
-//    
-//  const int imageWidth = regionSize[0];
-//  const int imageHeight = regionSize[1];
-//  const int imageStride = this->GetInput()->GetOffsetTable()[1]; 
-//  
-//  float* inputImage = this->GetOutput()->GetBufferPointer();
-//  float* outputImage  = m_GaussianBuffer->GetBufferPointer();
-////  printImage(imageWidth, imageHeight, imageStride, inputImage);
-//  
-//  ZeroCrossing(imageStride, imageWidth, imageHeight, inputImage, outputImage, imageStride);
-////  printImage(imageWidth, imageHeight, imageStride, outputImage);
 //
-//  float* boundaryImage = m_BoundaryBuffer1->GetBufferPointer(); 
-//  
+//    const int kernelWidth = 3;
+//    const int halfKernel = kernelWidth / 2;
 //    
-////void copy2DBoundaryChunk(const float* inBuffer, float* outBuffer,
-////                           const int outStride, const int outWidth, const int outHeight, 
-////                           const int replicateLeft, const int replicateTop,
-////                           const int replicateRight, const int replicateBottom,
-////                           const int inStride,  const int inWidth, const int inHeight);        
-//  //left boundaries
-//  int stride = calculateAlignedStride (12, sizeof(InputImagePixelType), 16 ); 
-//  
-//  copy2DBoundaryChunk(inputImage, boundaryImage,
-//                     stride, 12, imageHeight + 2, 
-//                     4, 1,
-//                     0, 1,
-//                     imageStride, imageWidth, imageHeight);  
-//                      
-////  printImage(12, imageHeight + 2, stride, boundaryImage);
-//  ZeroCrossing(stride, 12, imageHeight + 2, boundaryImage, outputImage - imageStride - 4, imageStride);
-////  cout << "left boundaries" << endl;
-////  printImage(imageWidth, imageHeight, imageStride, outputImage);
+//    int startX  = 0;
+//    int stopX   = imageWidth - 2 * halfKernel;
+//    int startY  = 0;
+//    int stopY   = imageHeight - 2 * halfKernel;
 //
-//  //right boundaries
-//  copy2DBoundaryChunk(inputImage, boundaryImage,
-//                     stride, 12, imageHeight + 2, 
-//                     0, 1,
-//                     4, 1,
-//                     imageStride, imageWidth, imageHeight);  
-//  
-//  
-////  printImage(12, imageHeight + 2, stride, boundaryImage);
-//  ZeroCrossing(stride, 12, imageHeight + 2, boundaryImage, outputImage - imageStride + imageWidth - 8, imageStride);
-////  cout << "right boundaries" << endl;
-////  printImage(imageWidth, imageHeight, imageStride, outputImage);
-//  
-//  stride = calculateAlignedStride (imageWidth + 8, sizeof(InputImagePixelType), ALIGMENT_BYTES ); 
-//  
-//  //top boundaries
-//  copy2DBoundaryChunk(inputImage, boundaryImage,
-//                     stride, imageWidth + 8, 3, 
-//                     4, 1,
-//                     4, 0,
-//                     imageStride, imageWidth, imageHeight);  
-//  
-////  printImage(imageWidth + 8, 3, stride, boundaryImage);
-//  ZeroCrossing(stride, imageWidth + 8, 3, boundaryImage, outputImage - imageStride - 4, imageStride);
-////  cout << "top boundaries" << endl;
-////  printImage(imageWidth, imageHeight, imageStride, outputImage);
-//  
-//  //bottom boundaries
-//  copy2DBoundaryChunk(inputImage, boundaryImage,
-//                     stride, imageWidth + 8, 3, 
-//                     4, 0,
-//                     4, 1,
-//                     imageStride, imageWidth, imageHeight);  
-//  
-////  printImage(imageWidth + 8, 3, stride, boundaryImage);
-//  ZeroCrossing(stride, imageWidth + 8, 3, boundaryImage, outputImage + (imageHeight - 2) * imageStride - 4, imageStride);
-////  cout << "bottom boundaries" << endl;
-//  printImage(imageWidth, imageHeight, imageStride, outputImage);  
+//      
+//    #pragma omp parallel for shared (gaussianInput, dxInput, outputImage) 
+//    for (int y = startY; y < stopY; ++y) {
+//      const register __m128 kdx0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);              
+//      const register __m128 kdx2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);          
+//      
+//      for (int x = startX; x < stopX; x += 4) {
+//        
+//        __m128 dx2dx_x, dx2dx_y, dxg_x, dxg_y;
+//        
+//        __m128 inv0 = _mm_load_ps(&dxInput[y * imageStride + x]);            
+//        __m128 inv1 = _mm_load_ps(&dxInput[(y + 1) * imageStride + x]);      
+//        __m128 inv2 = _mm_load_ps(&dxInput[(y + 2) * imageStride + x]);      
+//        
+//        __m128 inv0_4 = _mm_load_ps(&dxInput[y * imageStride + x + 4]);      
+//        __m128 inv1_4 = _mm_load_ps(&dxInput[(y + 1) * imageStride + x + 4]);
+//        __m128 inv2_4 = _mm_load_ps(&dxInput[(y + 2) * imageStride + x + 4]);
+//        
+//        register __m128 ktmp;
+//        
+//        ktmp = inv0;
+//        BLEND_ROTATE_LEFT(ktmp, inv0_4);
+//        dx2dx_y = kdx0 * ktmp;                                                  
+//        
+//        ktmp = inv2;
+//        BLEND_ROTATE_LEFT(ktmp, inv2_4);
+//        dx2dx_y += kdx2 * ktmp; 
+//        
+//        register __m128 kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);
+//        ktmp = _mm_setzero_ps();
+//        dx2dx_x = _mm_dp113_ps(inv1, kdx);
+//        ROTATE_RIGHT(kdx);                                                     
+//        dx2dx_x += _mm_dp226_ps(inv1, kdx);
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dx2dx_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv1_4, ktmp);
+//        ROTATE_RIGHT(ktmp);                                                     
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dx2dx_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv1_4, ktmp);
+//
+//        inv0 = _mm_load_ps(&gaussianInput[y * imageStride + x]);            
+//        inv1 = _mm_load_ps(&gaussianInput[(y + 1) * imageStride + x]);      
+//        inv2 = _mm_load_ps(&gaussianInput[(y + 2) * imageStride + x]);      
+//        
+//        inv0_4 = _mm_load_ps(&gaussianInput[y * imageStride + x + 4]);      
+//        inv1_4 = _mm_load_ps(&gaussianInput[(y + 1) * imageStride + x + 4]);
+//        inv2_4 = _mm_load_ps(&gaussianInput[(y + 2) * imageStride + x + 4]);
+//                                                            
+//        ktmp = _mm_setzero_ps();
+//        
+//        ktmp = inv0;
+//        BLEND_ROTATE_LEFT(ktmp, inv0_4);
+//        dxg_y = kdx0 * ktmp;
+//        
+//        ktmp = inv2;
+//        BLEND_ROTATE_LEFT(ktmp, inv2_4);
+//        dxg_y += kdx2 * ktmp;
+//        
+//        kdx = _mm_set_ps(0.0, -0.5, 0.0, 0.5);
+//        ktmp = _mm_setzero_ps();
+//        dxg_x = _mm_dp113_ps(inv1, kdx);
+//        ROTATE_RIGHT(kdx);                                                     
+//        dxg_x += _mm_dp226_ps(inv1, kdx);
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dxg_x += _mm_dp196_ps(inv1, kdx) + _mm_dp20_ps(inv1_4, ktmp);
+//        ROTATE_RIGHT(ktmp);                                                     
+//        ROTATE_RIGHT_BLEND(kdx, ktmp);                                         
+//        dxg_x += _mm_dp136_ps(inv1, kdx) + _mm_dp56_ps(inv1_4, ktmp);
+// 
+//        register __m128 gradMag = _mm_set1_ps(0.0001);
+//        register __m128 derivPos = _mm_setzero_ps();
+//         
+//        gradMag += dxg_x * dxg_x;
+//        gradMag += dxg_y * dxg_y;
+//        
+//        gradMag = _mm_sqrt_ps (gradMag);
+//        
+//        //calculate gradient of 2nd derivative
+//        derivPos = dx2dx_x * (dxg_x / gradMag /*calculate the directional derivative*/); 
+//        derivPos += dx2dx_y * (dxg_y / gradMag);
+//        derivPos = _mm_cmple_ps(derivPos,  _mm_setzero_ps());
+//        static const __m128 one = _mm_set1_ps(0x00000001);
+//        derivPos = _mm_and_ps(derivPos, one);
+//        derivPos = derivPos * gradMag;
+//        _mm_storeu_ps(&outputImage[(y + halfKernel) * outStride + (x + halfKernel)], derivPos); 
+//    }
+//  }
 //}
-
+//
 
 // Calculate the second derivative
 template< class TInputImage, class TOutputImage >
@@ -856,27 +922,18 @@ void
 OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 ::ZeroCrossing(const int imageStride, const int imageWidth, 
                const int imageHeight, 
-               const float* inputImage, float* outputImage, const int outStride, const int startX, const int stopX)
+               const float* inputImage, 
+               float* outputImage, 
+               const int outStride, 
+               const int startX, 
+               const int stopX)
 {
-//  return;
-//  typename TInputImage::SizeType regionSize = 
-//        this->GetInput()->GetRequestedRegion().GetSize();
-//          
-//    int imageWidth = regionSize[0];
-//    int imageHeight = regionSize[1];
-
-//    float* inputImage = this->GetOutput()->GetBufferPointer();
-//    float* outputImage  = m_GaussianBuffer->GetBufferPointer();
 
     const int kernelWidth = 3;
     const int halfKernel = kernelWidth / 2;
-//    const int imageStride = this->GetInput()->GetOffsetTable()[1];
-    
-//    int startX  = 0;
     int sstopX   = stopX ? stopX : (imageWidth - 2 * halfKernel);
     int startY  = 0;
     int stopY   = imageHeight - 2 * halfKernel;
-
       
     #pragma omp parallel for shared (inputImage, outputImage) 
     for (int y = startY; y < stopY; ++y) {
@@ -1377,3 +1434,287 @@ OpCannyEdgeDetectionImageFilter<TInputImage,TOutputImage>
 
 }//end of itk namespace
 #endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+//
+//
+//// Calculate the second derivative
+//template< class TInputImage, class TOutputImage >
+//void
+//OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
+//::Compute2ndDerivative(const int imageStride, const int imageWidth, 
+//                       const int imageHeight, 
+//                       const float* inputImage, float* lvv, float* lvvv, const int outStride) 
+//{ 
+//    const int kernelWidth = 3;
+//    const int halfKernel = kernelWidth / 2;
+//    
+//    int startX  = 0;
+//    int stopX   = imageWidth - 2 * halfKernel;
+//    int startY  = 2;
+//    int stopY   = (imageHeight - 2 * halfKernel);
+//    
+//    #pragma omp parallel for shared (inputImage, lvv) 
+//    for (int x = startX; x < stopX; x += 4) { 
+//      __m128 dx, dy, dxx, dyy, dxy;
+//      __m128 kv0, kv1, kv2;  
+//      __m128 iv00, iv01, iv02, iv10, iv11, iv12;   
+//      /*######################### [0,0] #####################*/
+//      int y = 0;  
+//      iv00 = _mm_load_ps(&inputImage[y * imageStride + x]);  
+//      iv01 = _mm_load_ps(&inputImage[(y + 1) * imageStride + x]); 
+//      iv02 = _mm_load_ps(&inputImage[(y + 2) * imageStride + x]);  
+//
+//      iv10 = _mm_load_ps(&inputImage[y * imageStride + 4 + x]);  
+//      iv11 = _mm_load_ps(&inputImage[(y + 1) * imageStride + 4 + x]);  
+//      iv12 = _mm_load_ps(&inputImage[(y + 2) * imageStride + 4 + x]);   
+//      
+//      //dx        
+//      kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//      dx = _mm_dpil_ps(iv01, kv0);
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+//      dxx = _mm_dp113_ps(iv01, kv0); 
+//      //dxy
+//      kv0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25); kv2 = _mm_shuffle_ps(kv0, kv0, _MM_SHUFFLE(1, 0, 3, 2)); 
+//      dxy = _mm_vdpil_ps(iv00, kv0, iv02, kv2);
+//      
+//      BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//      
+//      //dy
+//      kv0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);  kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);   
+//      dy = _mm_v2dp_ps(iv00, kv0, iv02, kv2);
+//      //dyy
+//      kv1 = _mm_set_ps(-2.0, -2.0, -2.0, -2.0);  
+//      dyy = _mm_v3mdp_ps(iv00, iv01, iv02, kv1);
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+//      dxx += _mm_dp114_ps(iv01, kv0); 
+//
+//      BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//      //dx        
+//      kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//      dx += _mm_dpih_ps(iv01, kv0);  
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+//      dxx += _mm_dp116_ps(iv01, kv0); 
+//      //dxy
+//      kv0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25); kv2 = _mm_shuffle_ps(kv0, kv0, _MM_SHUFFLE(1, 0, 3, 2)); 
+//      dxy += _mm_vdpih_ps(iv00, kv0, iv02, kv2);
+//      
+//      BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+//      dxx += _mm_dp120_ps(iv01, kv0); 
+//      
+//      BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//       
+//      //calc
+//      _mm_storeu_ps(&lvv[(y + halfKernel) * outStride + (x + halfKernel)], _mm_lvv_ps(dx, dy, dxx, dyy, dxy));  
+//       
+//                     
+//      /*######################### [0,1] #####################*/
+//      y = 1;        
+//      iv00 = _mm_load_ps(&inputImage[(y + 0) * imageStride + x]);  
+//      iv01 = _mm_load_ps(&inputImage[(y + 1) * imageStride + x]); 
+//      iv02 = _mm_load_ps(&inputImage[(y + 2) * imageStride + x]);  
+//
+//      iv10 = _mm_load_ps(&inputImage[(y + 0) *  imageStride + 4 + x]);  
+//      iv11 = _mm_load_ps(&inputImage[(y + 1) * imageStride + 4 + x]);  
+//      iv12 = _mm_load_ps(&inputImage[(y + 2) * imageStride + 4 + x]);   
+//      
+//      //dx        
+//      kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//      dx = _mm_dpil_ps(iv01, kv0);
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+//      dxx = _mm_dp113_ps(iv01, kv0); 
+//      //dxy
+//      kv0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25); kv2 = _mm_shuffle_ps(kv0, kv0, _MM_SHUFFLE(1, 0, 3, 2)); 
+//      dxy = _mm_vdpil_ps(iv00, kv0, iv02, kv2);
+//      
+//      BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//      
+//      //dy
+//      kv0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);  kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);   
+//      dy = _mm_v2dp_ps(iv00, kv0, iv02, kv2);
+//      //dyy
+//      kv1 = _mm_set_ps(-2.0, -2.0, -2.0, -2.0);  
+//      dyy = _mm_v3mdp_ps(iv00, iv01, iv02, kv1);
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+//      dxx += _mm_dp114_ps(iv01, kv0); 
+//
+//      BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//      //dx        
+//      kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//      dx += _mm_dpih_ps(iv01, kv0);  
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+//      dxx += _mm_dp116_ps(iv01, kv0); 
+//      //dxy
+//      kv0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25); kv2 = _mm_shuffle_ps(kv0, kv0, _MM_SHUFFLE(1, 0, 3, 2)); 
+//      dxy += _mm_vdpih_ps(iv00, kv0, iv02, kv2);
+//      
+//      BLEND_ROTATE1_LEFT(iv00, iv10)
+//      //dxx
+//      kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+//      dxx += _mm_dp120_ps(iv01, kv0); 
+//      
+//      //calc
+//      _mm_storeu_ps(&lvv[(y + halfKernel) * outStride + (x + halfKernel)], _mm_lvv_ps(dx, dy, dxx, dyy, dxy));  
+//
+//
+//    }        
+//    
+//    #pragma omp parallel for shared (inputImage, lvv, lvvv) 
+//    for (int y = startY; y < stopY; ++y) {
+//      for (int x = startX; x < stopX; x += 4) { 
+//        __m128 dx, dy, dxx, dyy, dxy;
+//        __m128 kv0, kv1, kv2;  
+//        __m128 iv00, iv01, iv02, iv10, iv11, iv12;   
+//        /*######################### [0,0] #####################*/
+//        iv00 = _mm_load_ps(&inputImage[y * imageStride + x]);  
+//        iv01 = _mm_load_ps(&inputImage[(y + 1) * imageStride + x]); 
+//        iv02 = _mm_load_ps(&inputImage[(y + 2) * imageStride + x]);  
+//  
+//        iv10 = _mm_load_ps(&inputImage[y * imageStride + 4 + x]);  
+//        iv11 = _mm_load_ps(&inputImage[(y + 1) * imageStride + 4 + x]);  
+//        iv12 = _mm_load_ps(&inputImage[(y + 2) * imageStride + 4 + x]);   
+//        
+//        //dx        
+//        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//        dx = _mm_dpil_ps(iv01, kv0);
+//        //dxx
+//        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+//        dxx = _mm_dp113_ps(iv01, kv0); 
+//        //dxy
+//        kv0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25); kv2 = _mm_shuffle_ps(kv0, kv0, _MM_SHUFFLE(1, 0, 3, 2)); 
+//        dxy = _mm_vdpil_ps(iv00, kv0, iv02, kv2);
+//        
+//        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//        
+//        //dy
+//        kv0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);  kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);   
+//        dy = _mm_v2dp_ps(iv00, kv0, iv02, kv2);
+//        //dyy
+//        kv1 = _mm_set_ps(-2.0, -2.0, -2.0, -2.0);  
+//        dyy = _mm_v3mdp_ps(iv00, iv01, iv02, kv1);
+//        //dxx
+//        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0);
+//        dxx += _mm_dp114_ps(iv01, kv0); 
+//  
+//        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//        //dx        
+//        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//        dx += _mm_dpih_ps(iv01, kv0);  
+//        //dxx
+//        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+//        dxx += _mm_dp116_ps(iv01, kv0); 
+//        //dxy
+//        kv0 = _mm_set_ps(0.25, 0.25, -0.25, -0.25); kv2 = _mm_shuffle_ps(kv0, kv0, _MM_SHUFFLE(1, 0, 3, 2)); 
+//        dxy += _mm_vdpih_ps(iv00, kv0, iv02, kv2);
+//        
+//        BLEND_ROTATE1_LEFT(iv01, iv11)
+//        //dxx
+//        kv0 = _mm_set_ps(0.0, 1.0, -2.0, 1.0); 
+//        dxx += _mm_dp120_ps(iv01, kv0); 
+//        //calc
+//        _mm_storeu_ps(&lvv[(y + halfKernel) * outStride + (x + halfKernel)], _mm_lvv_ps(dx, dy, dxx, dyy, dxy));  
+//        
+//
+//        PRINT_TRACE("Derradero ever"); 
+//  
+//        iv00 = _mm_load_ps(&inputImage[(y - 2) * imageStride + x]);                                                    
+//        iv01 = _mm_load_ps(&inputImage[(y - 1) * imageStride + x]);                                                    
+//        iv02 = _mm_load_ps(&inputImage[(y - 0) * imageStride + x]);                                                         
+//        
+//        iv10 = _mm_load_ps(&inputImage[(y - 2) * imageStride + x + 4]);                                                    
+//        iv11 = _mm_load_ps(&inputImage[(y - 1) * imageStride + x + 4]);                                                    
+//        iv12 = _mm_load_ps(&inputImage[(y - 0) * imageStride + x + 4]);                                                       
+//        
+//        PRINT_VECTOR_TRACE(iv00);
+//        PRINT_VECTOR_TRACE(iv01); 
+//        PRINT_VECTOR_TRACE(iv02);  
+//        
+//        PRINT_VECTOR_TRACE(iv10);
+//        PRINT_VECTOR_TRACE(iv11);//dx        
+//        PRINT_VECTOR_TRACE(iv12); 
+//                                                                            
+//        
+//        //dx
+//        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//        dx = _mm_dpil_ps(iv01, kv0);   
+//        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12)
+//        //dy
+//        kv0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);  kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);   
+//        dy = _mm_v2dp_ps(iv00, kv0, iv02, kv2); 
+//        
+//        BLEND_ROTATE1_LEFT(iv01, iv11)
+//        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);
+//        dx += _mm_dpih_ps(iv01, kv0);   
+//        
+//        iv00 = _mm_load_ps(&lvv[(y - 2) * imageStride + x]);                                                    
+//        iv01 = _mm_load_ps(&lvv[(y - 1) * imageStride + x]);                                                    
+//        iv02 = _mm_load_ps(&lvv[(y - 0) * imageStride + x]);                                                         
+//        iv10 = _mm_load_ps(&lvv[(y - 2) * imageStride + x + 4]);                                                    
+//        iv11 = _mm_load_ps(&lvv[(y - 1) * imageStride + x + 4]);                                                    
+//        iv12 = _mm_load_ps(&lvv[(y - 0) * imageStride + x + 4]);                                                        
+//
+//        PRINT_VECTOR_TRACE(iv00);
+//        PRINT_VECTOR_TRACE(iv01); 
+//        PRINT_VECTOR_TRACE(iv02);  
+//        
+//        PRINT_VECTOR_TRACE(iv10);
+//        PRINT_VECTOR_TRACE(iv11);//dx        
+//        PRINT_VECTOR_TRACE(iv12);                 
+//        
+//        //Lvvx                                  
+//        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);                                                              
+//        dxx = _mm_dpil_ps(iv01, kv0);                                                                         
+//        BLEND_ROTATE31_LEFT(iv00, iv10, iv01, iv11, iv02, iv12) 
+//        //Lvvy                                                                                                
+//        kv0 = _mm_set_ps(0.5, 0.5, 0.5, 0.5);  kv2 = _mm_set_ps(-0.5, -0.5, -0.5, -0.5);   
+//        dyy = _mm_v2dp_ps(iv00, kv0, iv02, kv2); 
+//
+//        BLEND_ROTATE1_LEFT(iv01, iv11) 
+//        //dxx
+//        kv0 = _mm_set_ps(0.5, 0.5, -0.5, -0.5);                                                              
+//        dxx += _mm_dpih_ps(iv01, kv0);                                                                        
+//                
+//        PRINT_VECTOR_TRACE(dy);
+//        PRINT_VECTOR_TRACE(dx);
+//        PRINT_VECTOR_TRACE(dyy);
+//        PRINT_VECTOR_TRACE(dxx);
+//
+//                                                                                                                                                                                                                            
+//        dxy = dx * dx + dy * dy;                                                                              PRINT_VECTOR_TRACE(dxy);
+//        dxy = _mm_sqrt_ps (dxy);                                                                              PRINT_VECTOR_TRACE(dxy);
+//        //calculate gradient of 2nd derivative                                                                
+//        /*calculate the directional derivative*/                                                              
+//        iv00 /*derivPos*/ = dxx * (dx / dxy);                                                                 PRINT_VECTOR_TRACE(iv00);
+//        iv00 += dyy * (dy / dxy);                                                                             PRINT_VECTOR_TRACE(iv00);
+//        iv00 = _mm_cmple_ps(iv00,  _mm_setzero_ps());                                                         PRINT_VECTOR_TRACE(iv00); 
+//        iv00 = _mm_and_ps(iv00, _mm_set1_ps(0x00000001));                                                     PRINT_VECTOR_TRACE(iv00);
+//        iv00 *= dxy;                                                                                          PRINT_VECTOR_TRACE(iv00);  
+//         
+//        _mm_storeu_ps(&lvvv[(y - 2 + halfKernel) * outStride + (x + halfKernel)], iv00);  
+//    }
+//  }
+//}

@@ -378,9 +378,13 @@ private:
    *  and multithreading mechanism.   */
   void Compute2ndDerivative();
   
+//  void Compute2ndDerivative(const int imageStride, const int imageWidth, 
+//                            const int imageHeight, 
+//                            const float* inputImage, float* lvv, float* lvvv, const int outStride);
+                            
   void Compute2ndDerivative(const int imageStride, const int imageWidth, 
-                            const int imageHeight, 
-                            const float* inputImage, float* outputImage, const int outStride);
+                       const int imageHeight, 
+                       const float* inputImage, float* outputImage, const int outStride);                            
 
   void Compute2ndDerivativePos();
   

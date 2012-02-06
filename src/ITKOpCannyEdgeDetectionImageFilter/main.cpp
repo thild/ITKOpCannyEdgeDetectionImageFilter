@@ -363,7 +363,7 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
      
     cout << left << 
       setw(60) << "Total dataset time" << 
-      setw(15)  << setprecision(6) << datasetStat.MeanTime << 
+      setw(15)  << setprecision(6) << datasetStat.MeanTime <<  
       setw(15) << datasetStat.StDevTime << 
       setw(15) << setprecision(1) << datasetStat.StDevTimePercentage << 
       setw(15) << setprecision(6) << datasetStat.MeanTime / (nfiles / iterations) << 
