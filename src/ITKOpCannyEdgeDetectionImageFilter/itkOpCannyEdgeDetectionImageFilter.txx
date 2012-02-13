@@ -1314,7 +1314,9 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   int stopY = height * stride;
   int startY  = 0;
   
-//#ifdef __SSE4_1__
+#ifndef __SSE4_1__
+  #pragma omp parallel for
+#endif
   for (int y = startY; y < stopY; y += 4) {
       __m128 inv0 = _mm_load_ps(&input1[y]);   PRINT_VECTOR(inv0);
       __m128 inv1 = _mm_load_ps(&input2[y]);   PRINT_VECTOR(inv1);
@@ -1385,7 +1387,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
 //    output[y] = input1[y] * miniBuffer[i++];  
 //  }    
 //#endif    
-//    
+    
 }
 
 //
