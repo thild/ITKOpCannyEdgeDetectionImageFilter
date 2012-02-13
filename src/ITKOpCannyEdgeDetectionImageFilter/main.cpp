@@ -45,7 +45,7 @@
 
 #include <iostream> 
 #include <iomanip>
-#include <string>
+#include <string> 
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -90,7 +90,8 @@ typedef itk::Image< RealPixelType, Dimension >    RealImageType;
 typedef itk::ImageFileReader< CharImageType >  ReaderType;
 typedef itk::ImageFileWriter< CharImageType >  WriterType;
 
-typedef itk::ImageRegionIterator<RealImageType> ImageIterator;
+typedef itk::ImageRegionIterator<RealImageType> RealImageIterator;
+typedef itk::ImageRegionIterator<CharImageType> CharImageIterator;
 
 typedef itk::CastImageFilter< CharImageType, RealImageType> CastToRealFilterType;
 typedef itk::CastImageFilter< RealImageType, CharImageType> CastToCharFilterType;
@@ -305,6 +306,25 @@ void TestDataset(string alg, string datasetsPath, string dataSet, int iterations
           log << setprecision(0) << itime.str() << "," << i + 1<< "," << p.string() << "," << j << "," << "Total" << "," << setprecision(6) << swImage.GetElapsedTime() << endl;
           
           ++j;
+          
+          if (testIO) {
+              RescaleFilter::Pointer rescale = RescaleFilter::New();
+              rescale->SetOutputMinimum( 0 );
+              rescale->SetOutputMaximum( 255 );
+              rescale->SetInput( cannyFilter->GetOutput() );
+              rescale->Update();          
+              WriterType::Pointer writer = WriterType::New();
+              if(alg == "OpCannyEdgeDetectionImageFilter") {
+                writer->SetFileName("results/op/" + dataSet + "/" + p.filename().string());
+              }
+              else {
+                writer->SetFileName("results/native/" + dataSet + "/" + p.filename().string());
+
+              }
+              writer->SetInput( rescale->GetOutput() );
+              writer->Update();            
+          }
+                    
         }
       }
       iterationStats.push_back(IterationStatInfo(i, imageStats)); 
@@ -471,10 +491,8 @@ int main (int argc, char *argv[])
     //for all datasets  
     for ( vector<string>::iterator ds = dataSets.begin(); ds != dataSets.end(); ds++ ) {
       
-      fs::create_directory(fs::path("results/" + *ds));
-      fs::create_directory(fs::path("results/" + *ds + "/op"));
-      fs::create_directory(fs::path("results/" + *ds));
-      fs::create_directory(fs::path("results/" + *ds + "/native"));
+      fs::create_directories(fs::path("results/op/" + *ds));
+      fs::create_directories(fs::path("results/native/" + *ds));
   
       string datasetsPath = config["dsfolder"] +  string("/");
        
@@ -510,19 +528,7 @@ int main (int argc, char *argv[])
      
       cout << "Running " <<  *ds << " dataset conformance test..." << endl;
       
-      string createPath = "results";
-      fs::create_directory(createPath);
-      
-      createPath += "/conformance";
-      fs::create_directory(createPath);
-      createPath += *ds;
-      fs::create_directory(createPath);
-      
-      fs::create_directory(createPath + "/op");
-      fs::create_directory(createPath + "/native");
-      
       fs::path current_dir(datasetsPath + *ds ); 
-      
       fs::directory_iterator it(current_dir), eod;
       
       foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
@@ -530,8 +536,6 @@ int main (int argc, char *argv[])
           ++tf;
           ReaderType::Pointer opReader = ReaderType::New();
           ReaderType::Pointer nativeReader = ReaderType::New();
-          
-          //cout << "Reading " + p.string() << endl;
           
           opReader->SetFileName(p.string());
           nativeReader->SetFileName(p.string());
@@ -563,17 +567,17 @@ int main (int argc, char *argv[])
           opCannyFilter->Update(); 
           nativeCannyFilter->Update();
               
-//          RescaleFilter::Pointer opRescale = RescaleFilter::New();
-//          opRescale->SetOutputMinimum(   0 );
-//          opRescale->SetOutputMaximum( 255 );
-//          opRescale->SetInput( opCannyFilter->GetOutput() );
-//          opRescale->Update();
-//          
-//          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
-//          nativeRescale->SetOutputMinimum(   0 );
-//          nativeRescale->SetOutputMaximum( 255 );
-//          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
-//          nativeRescale->Update();
+          RescaleFilter::Pointer opRescale = RescaleFilter::New();
+          opRescale->SetOutputMinimum(   0 );
+          opRescale->SetOutputMaximum( 255 );
+          opRescale->SetInput( opCannyFilter->GetOutput() );
+          opRescale->Update();
+          
+          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
+          nativeRescale->SetOutputMinimum(   0 );
+          nativeRescale->SetOutputMaximum( 255 );
+          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
+          nativeRescale->Update();
 //              
 //              
 //          WriterType::Pointer writer = WriterType::New();
@@ -634,13 +638,37 @@ int main (int argc, char *argv[])
 //            }
 //      
 //     
-      
-                  
+//          float* outputImage = opCannyFilter->GetOutput()->GetBufferPointer();
+//          int imageStride = opCannyFilter->GetInput()->GetOffsetTable()[1];
+//           
+//          typename RealImageType::SizeType regionSize = 
+//          opCannyFilter->GetInput()->GetRequestedRegion().GetSize();           
+//          
+//          printImage(regionSize[0], regionSize[1], imageStride, outputImage);  
+//          
+//          cout << "way???" << endl;
+//            
+//          outputImage = nativeCannyFilter->GetOutput()->GetBufferPointer();
+//          imageStride = nativeCannyFilter->GetInput()->GetOffsetTable()[1];
+//           
+//          regionSize = nativeCannyFilter->GetInput()->GetRequestedRegion().GetSize();           
+//          
+//          printImage(regionSize[0], regionSize[1], imageStride, outputImage);  
+         
+          
+              
+
           RealImageType::Pointer opIm = opCannyFilter->GetOutput();
           RealImageType::Pointer nativeIm = nativeCannyFilter->GetOutput();
-
-          ImageIterator  opIt( opIm, opIm->GetLargestPossibleRegion() );
-          ImageIterator  nativeIt( nativeIm, nativeIm->GetLargestPossibleRegion());
+      
+          RealImageIterator  opIt( opIm, opIm->GetLargestPossibleRegion() );
+          RealImageIterator  nativeIt( nativeIm, nativeIm->GetLargestPossibleRegion());
+                  
+//          CharImageType::Pointer opIm = opRescale->GetOutput();
+//          CharImageType::Pointer nativeIm = nativeRescale->GetOutput();
+//
+//          CharImageIterator  opIt( opIm, opIm->GetLargestPossibleRegion() );
+//          CharImageIterator  nativeIt( nativeIm, nativeIm->GetLargestPossibleRegion());
           
           opIt.GoToBegin();
           nativeIt.GoToBegin();
@@ -652,17 +680,20 @@ int main (int argc, char *argv[])
           cout.precision(6);
           while( !opIt.IsAtEnd() && !nativeIt.IsAtEnd() )
           { 
-            float  op = opIt.Get();
-            float  n =  nativeIt.Get();
-            if (n == 1) ++ni;
-            if (op == 1) ++nb;
-            if (op == 1 && n == 1) {
+            //cout << (int)opIt.Get() << " ";
+            float op = opIt.Get();
+            float n =  nativeIt.Get();
+            float one = 1;
+            float zero = 0; 
+            if (n == one) ++ni;
+            if (op == one) ++nb;
+            if (op == one && n == one) {
               ++tp;
             }
-            else if (op == 0 && n == 1) {
+            else if (op == zero && n == one) {
               ++fn;  
             } 
-            else if (op == 1 && n == 0) {
+            else if (op == one && n == zero) {
               ++fp;  
             }  
             ++opIt;
