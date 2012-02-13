@@ -1314,13 +1314,13 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   int stopY = height * stride;
   int startY  = 0;
   
-#ifdef __SSE4_1__
-  for (int y = startY; y < stopY; y += 4) {
-      __m128 inv0 = _mm_load_ps(&input1[y]);   PRINT_VECTOR(inv0);
-      __m128 inv1 = _mm_load_ps(&input2[y]);   PRINT_VECTOR(inv1);
-      _mm_stream_ps(&output[y], _mm_mul_ps(inv0, inv1));
-  }
-#else
+//#ifdef __SSE4_1__
+//  for (int y = startY; y < stopY; y += 4) {
+//      __m128 inv0 = _mm_load_ps(&input1[y]);   PRINT_VECTOR(inv0);
+//      __m128 inv1 = _mm_load_ps(&input2[y]);   PRINT_VECTOR(inv1);
+//      _mm_stream_ps(&output[y], _mm_mul_ps(inv0, inv1));
+//  }
+//#else
   int i = 0;
   static float miniBuffer[31];
   for (int y = stopY - 31; y < stopY; ++y) {
@@ -1383,7 +1383,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   for (int y = stopY - 31; y < stopY; ++y) {
     output[y] = input1[y] * miniBuffer[i++];  
   }    
-#endif    
+//#endi6f    
     
 }
 
