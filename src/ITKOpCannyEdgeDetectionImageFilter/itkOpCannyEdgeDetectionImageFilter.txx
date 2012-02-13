@@ -1348,35 +1348,34 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
     b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
     __m128 inv3 = _mm_mul_ps(a, b);
 
-    _mm_stream_ps(&output[y], inv0);
-    _mm_stream_ps(&output[y + 4], inv1);
-    _mm_stream_ps(&output[y + 8], inv2);
-    _mm_stream_ps(&output[y + 12], inv3);
-          
     idx += 4;
     a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
     b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-    inv0 = _mm_mul_ps(a, b);
+    __m128 inv4 = _mm_mul_ps(a, b);
     
     idx += 4;
     a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
     b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-    inv1 = _mm_mul_ps(a, b);
+    __m128 inv5 = _mm_mul_ps(a, b);
     
     idx += 4;
     a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
     b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-    inv2 = _mm_mul_ps(a, b);
+    __m128 inv6 = _mm_mul_ps(a, b);
     
     idx += 4;
     a = _mm_load_ps(&input1[idx]);   PRINT_VECTOR(inv0);
     b = _mm_load_ps(&input2[idx]);   PRINT_VECTOR(inv1);
-    inv3 = _mm_mul_ps(a, b);
-    
-    _mm_store_ps(&output[y + 16], inv0);
-    _mm_store_ps(&output[y + 20], inv1);
-    _mm_store_ps(&output[y + 24], inv2);
-    _mm_store_ps(&output[y + 28], inv3);
+    __m128 inv7 = _mm_mul_ps(a, b);
+
+    _mm_store_ps(&output[y], inv0);
+    _mm_store_ps(&output[y + 4], inv1);
+    _mm_store_ps(&output[y + 8], inv2);
+    _mm_store_ps(&output[y + 12], inv3);
+    _mm_store_ps(&output[y + 16], inv4);
+    _mm_store_ps(&output[y + 20], inv5);
+    _mm_store_ps(&output[y + 24], inv6);
+    _mm_store_ps(&output[y + 28], inv7);
   }
   
 //    _mm_sfence();
