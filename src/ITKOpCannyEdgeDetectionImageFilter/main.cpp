@@ -547,10 +547,10 @@ int main (int argc, char *argv[])
           CastToRealFilterType::Pointer opToReal = CastToRealFilterType::New();  
           opToReal->SetInput( opReader->GetOutput() );
           opToReal->Update();
-              
-          CastToRealFilterType::Pointer nativeToReal = CastToRealFilterType::New();  
-          nativeToReal->SetInput( nativeReader->GetOutput() );
-          nativeToReal->Update();
+//              
+//          CastToRealFilterType::Pointer nativeToReal = CastToRealFilterType::New();  
+//          nativeToReal->SetInput( nativeReader->GetOutput() );
+//          nativeToReal->Update();
               
           OpCannyFilter::Pointer opCannyFilter = OpCannyFilter::New();
           opCannyFilter->SetVariance( variance );
@@ -563,7 +563,7 @@ int main (int argc, char *argv[])
           nativeCannyFilter->SetLowerThreshold( lowerThreshold );
               
           opCannyFilter->SetInput( opToReal->GetOutput() );
-          nativeCannyFilter->SetInput( nativeToReal->GetOutput() );
+          nativeCannyFilter->SetInput( opToReal->GetOutput() );
           
           opCannyFilter->Update(); 
           nativeCannyFilter->Update();
