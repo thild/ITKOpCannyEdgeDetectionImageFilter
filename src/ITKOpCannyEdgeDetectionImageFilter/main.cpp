@@ -536,18 +536,13 @@ int main (int argc, char *argv[])
         if (is_regular_file(p)) { 
           ++tf;
           
-          ReaderType::Pointer opReader = ReaderType::New();
-          ReaderType::Pointer nativeReader = ReaderType::New();
-    
-          opReader->SetFileName(p.string());
-          nativeReader->SetFileName(p.string());
-          
-          opReader->Update();
-          nativeReader->Update();
+          ReaderType::Pointer reader = ReaderType::New();
+          reader->SetFileName(p.string());
+          reader->Update();
 
-          CastToRealFilterType::Pointer opToReal = CastToRealFilterType::New();  
-          opToReal->SetInput( opReader->GetOutput() );
-          opToReal->Update();
+          CastToRealFilterType::Pointer toReal = CastToRealFilterType::New();  
+          toReal->SetInput( reader->GetOutput() );
+          toReal->Update();
 //              
 //          CastToRealFilterType::Pointer nativeToReal = CastToRealFilterType::New();  
 //          nativeToReal->SetInput( nativeReader->GetOutput() );
@@ -563,8 +558,8 @@ int main (int argc, char *argv[])
           nativeCannyFilter->SetUpperThreshold( upperThreshold );
           nativeCannyFilter->SetLowerThreshold( lowerThreshold );
               
-          opCannyFilter->SetInput( opToReal->GetOutput() );
-          nativeCannyFilter->SetInput( opToReal->GetOutput() );
+          opCannyFilter->SetInput( toReal->GetOutput() );
+          nativeCannyFilter->SetInput( toReal->GetOutput() );
           
           opCannyFilter->Update(); 
           nativeCannyFilter->Update();
