@@ -531,13 +531,14 @@ int main (int argc, char *argv[])
       fs::path current_dir(datasetsPath + *ds ); 
       fs::directory_iterator it(current_dir), eod;
 
-      ReaderType::Pointer opReader = ReaderType::New();
-      ReaderType::Pointer nativeReader = ReaderType::New();
       
       foreach (fs::path const & p, std::make_pair(it, eod)) { //for all files 
         if (is_regular_file(p)) { 
           ++tf;
           
+          ReaderType::Pointer opReader = ReaderType::New();
+          ReaderType::Pointer nativeReader = ReaderType::New();
+    
           opReader->SetFileName(p.string());
           nativeReader->SetFileName(p.string());
           
