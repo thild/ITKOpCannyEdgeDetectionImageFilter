@@ -26,6 +26,8 @@
 
 #include "itkStopWatch.h"
 
+#include <valgrind/callgrind.h>
+
 #include "opConvolutionFilter.h"
 
 #include <omp.h>
@@ -205,6 +207,7 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   this->ZeroCrossing();    
   sw->AddCheckpoint("ZeroCrossing");  
   
+  CALLGRIND_START_INSTRUMENTATION;
   sw->AddCheckpoint("Begin Multiply", true);
   this->Multiply(stride, nHeight,  
                  m_UpdateBuffer->GetBufferPointer(), 
@@ -215,7 +218,11 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   sw->AddCheckpoint("Begin HysteresisThresholding", true);
   StopWatch b;
   b.Start();
+  CALLGRIND_TOGGLE_COLLECT;
   this->HysteresisThresholding();                    
+  CALLGRIND_TOGGLE_COLLECT;
+  CALLGRIND_STOP_INSTRUMENTATION;  
+  
   b.Stop();
   sw->AddCheckpoint("HysteresisThresholding");
              
