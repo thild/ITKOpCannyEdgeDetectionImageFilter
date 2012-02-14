@@ -567,18 +567,18 @@ int main (int argc, char *argv[])
           
           opCannyFilter->Update(); 
           nativeCannyFilter->Update();
-              
-          RescaleFilter::Pointer opRescale = RescaleFilter::New();
-          opRescale->SetOutputMinimum(   0 );
-          opRescale->SetOutputMaximum( 255 );
-          opRescale->SetInput( opCannyFilter->GetOutput() );
-          opRescale->Update();
-          
-          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
-          nativeRescale->SetOutputMinimum(   0 );
-          nativeRescale->SetOutputMaximum( 255 );
-          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
-          nativeRescale->Update();
+//              
+//          RescaleFilter::Pointer opRescale = RescaleFilter::New();
+//          opRescale->SetOutputMinimum(   0 );
+//          opRescale->SetOutputMaximum( 255 );
+//          opRescale->SetInput( opCannyFilter->GetOutput() );
+//          opRescale->Update();
+//          
+//          RescaleFilter::Pointer nativeRescale = RescaleFilter::New();
+//          nativeRescale->SetOutputMinimum(   0 );
+//          nativeRescale->SetOutputMaximum( 255 );
+//          nativeRescale->SetInput( nativeCannyFilter->GetOutput() );
+//          nativeRescale->Update();
 //              
 //              
 //          WriterType::Pointer writer = WriterType::New();
