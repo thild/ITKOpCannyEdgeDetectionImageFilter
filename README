@@ -1,0 +1,50 @@
+More informations in: http://web.inf.ufpr.br/vri/alumni/2012-TonyHild/
+
+Instructions to build ITKOpCannyEdgeDetectionFilter
+
+Step 1: Download one of the ITK versions between 3.16 and 3.20 from http://www.itk.org/ITK/resources/software.html.
+
+Apply the patch:
+$ cd /root/directory/where/is/found/InsightToolkit-3.x
+$ wget http://git.io/B_rojg
+$ ln -s InsightToolkit-3.x/Code Original-Code
+$ patch -p0 < itkop.patch
+
+Step 2: Build ITK with fowlling flags:
+
+$ mkdir InsightTootlkit-3.x-build
+$ cd InsightTootlkit-3.x-build
+ccmake ../InsightToolkit-3.x
+
+add the fowlling flags:
+CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
+CMAKE_BUILD_TYPE:STRING=Release
+CMAKE_CXX_FLAGS:STRING=-fabi-version=5
+CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG -mfpmath=sse -march=native -mtune=native -ffast-math -ftree-vectorize
+CMAKE_EXE_LINKER_FLAGS:STRING=-lrt
+CMAKE_INSTALL_PREFIX:PATH=/path/to/patched/install
+
+$ make
+
+Step 3: Download the latest ITKOpCannyEdgeDetectionFilter source code from https://github.com/thild/ITKOpCannyEdgeDetectionImageFilter
+
+$ mkdir ITKOpCannyEdgeDetectionFilter-Build
+$ cd ITKOpCannyEdgeDetectionFilter-Build
+$ ccmake .
+
+add the fowlling flags:
+CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
+CMAKE_BUILD_TYPE:STRING=Release
+CMAKE_CXX_FLAGS:STRING=-fopenmp -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2 -fabi-version=5
+CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG -mfpmath=sse -march=native -mtune=native -ffast-math -ftree-vectorize
+CMAKE_INSTALL_PREFIX:PATH=../ITKOpCannyEdgeDetectionImageFilter-Bin
+ITK_DIR:PATH=/path/to/patched/install/of/InsightToolkit-3.x
+
+$ make install
+$ cd ../ITKOpCannyEdgeDetectionFilter-Bin/bin
+$ wget http://dl.dropbox.com/u/6882617/dataset.tar.gz
+$ tar zxf dataset.tar.gz
+$ cd dataset/bin
+$ ./generate_datasets 6
+$ ./opcanny -pt -c test.cfg
+
