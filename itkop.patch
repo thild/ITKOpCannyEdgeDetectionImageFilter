@@ -1,6 +1,6 @@
 diff -uNBr Original-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx Op-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx
 --- Original-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2009-08-17 09:01:33.000000000 -0300
-+++ Op-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2012-01-16 05:08:13.010463829 -0200
++++ Op-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx	2012-02-16 03:30:35.497820232 -0200
 @@ -23,6 +23,7 @@
  #include "itkNumericTraits.h"
  #include "itkProgressReporter.h"
@@ -64,7 +64,7 @@ diff -uNBr Original-Code//BasicFilters/itkCannyEdgeDetectionImageFilter.txx Op-C
  template< class TInputImage, class TOutputImage >
 diff -uNBr Original-Code//Common/CMakeLists.txt Op-Code//Common/CMakeLists.txt
 --- Original-Code//Common/CMakeLists.txt	2009-02-11 21:13:55.000000000 -0200
-+++ Op-Code//Common/CMakeLists.txt	2012-01-16 05:08:13.132458562 -0200
++++ Op-Code//Common/CMakeLists.txt	2012-02-16 03:30:35.511819646 -0200
 @@ -1,5 +1,7 @@
  # Sources of non-templated classes.
  SET(ITKCommon_SRCS
@@ -75,7 +75,7 @@ diff -uNBr Original-Code//Common/CMakeLists.txt Op-Code//Common/CMakeLists.txt
    itkChainCodePath2D.cxx
 diff -uNBr Original-Code//Common/itkAlignedBuffer.cxx Op-Code//Common/itkAlignedBuffer.cxx
 --- Original-Code//Common/itkAlignedBuffer.cxx	1969-12-31 21:00:00.000000000 -0300
-+++ Op-Code//Common/itkAlignedBuffer.cxx	2012-01-16 05:08:13.161457305 -0200
++++ Op-Code//Common/itkAlignedBuffer.cxx	2012-02-16 03:30:35.517819394 -0200
 @@ -0,0 +1,86 @@
 +#include "itkAlignedBuffer.h"
 +
@@ -165,7 +165,7 @@ diff -uNBr Original-Code//Common/itkAlignedBuffer.cxx Op-Code//Common/itkAligned
 +
 diff -uNBr Original-Code//Common/itkAlignedBuffer.h Op-Code//Common/itkAlignedBuffer.h
 --- Original-Code//Common/itkAlignedBuffer.h	1969-12-31 21:00:00.000000000 -0300
-+++ Op-Code//Common/itkAlignedBuffer.h	2012-01-16 05:08:13.162457265 -0200
++++ Op-Code//Common/itkAlignedBuffer.h	2012-02-16 03:30:35.517819394 -0200
 @@ -0,0 +1,63 @@
 +#ifndef __itkAlignedBuffer_h
 +#define __itkAlignedBuffer_h
@@ -232,17 +232,18 @@ diff -uNBr Original-Code//Common/itkAlignedBuffer.h Op-Code//Common/itkAlignedBu
 +#endif 
 diff -uNBr Original-Code//Common/itkConstNeighborhoodIterator.txx Op-Code//Common/itkConstNeighborhoodIterator.txx
 --- Original-Code//Common/itkConstNeighborhoodIterator.txx	2006-08-02 08:48:41.000000000 -0300
-+++ Op-Code//Common/itkConstNeighborhoodIterator.txx	2012-01-16 05:08:13.192455968 -0200
-@@ -557,6 +557,8 @@
++++ Op-Code//Common/itkConstNeighborhoodIterator.txx	2012-02-16 03:30:35.525819058 -0200
+@@ -557,6 +557,9 @@
    const OffsetValueType *offset   = m_ConstImage->GetOffsetTable();
    const IndexType imageBRStart  = m_ConstImage->GetBufferedRegion().GetIndex();
    SizeType imageBRSize = m_ConstImage->GetBufferedRegion().GetSize();
 +  SizeType wrapBRSize = m_ConstImage->GetBufferedRegion().GetSize();
-+  wrapBRSize[0] = m_ConstImage->GetOffsetTable()[1];
++  //we need get next line depending on stride
++  wrapBRSize[0] = m_ConstImage->GetOffsetTable()[1]; 
  
    // Set the bounds and the wrapping offsets. Inner bounds are the loop
    // indicies where the iterator will begin to overlap the edge of the image
-@@ -568,7 +570,7 @@
+@@ -568,7 +571,7 @@
                  + ( imageBRSize[i]) - static_cast<SizeValueType>(radius[i]) );
      m_InnerBoundsLow[i] = static_cast<IndexValueType>(imageBRStart[i] 
                                                                     + radius[i]);
@@ -253,7 +254,7 @@ diff -uNBr Original-Code//Common/itkConstNeighborhoodIterator.txx Op-Code//Commo
    m_WrapOffset[Dimension-1] = 0; // last offset is zero because there are no
 diff -uNBr Original-Code//Common/itkImageBase.h Op-Code//Common/itkImageBase.h
 --- Original-Code//Common/itkImageBase.h	2009-07-12 07:52:52.000000000 -0300
-+++ Op-Code//Common/itkImageBase.h	2012-01-16 05:08:13.096460119 -0200
++++ Op-Code//Common/itkImageBase.h	2012-02-16 03:30:35.509819730 -0200
 @@ -611,7 +611,7 @@
     * along a row, column, slice, volume, etc. These offsets are based
     * on the size of the BufferedRegion. This should be called after
@@ -281,7 +282,7 @@ diff -uNBr Original-Code//Common/itkImageBase.h Op-Code//Common/itkImageBase.h
    RegionType          m_BufferedRegion;
 diff -uNBr Original-Code//Common/itkImage.h Op-Code//Common/itkImage.h
 --- Original-Code//Common/itkImage.h	2009-08-14 10:28:21.000000000 -0300
-+++ Op-Code//Common/itkImage.h	2012-01-16 05:08:13.070461245 -0200
++++ Op-Code//Common/itkImage.h	2012-02-16 03:30:35.503819980 -0200
 @@ -26,6 +26,7 @@
  #include "itkFixedArray.h"
  #include "itkWeakPointer.h"
@@ -305,7 +306,7 @@ diff -uNBr Original-Code//Common/itkImage.h Op-Code//Common/itkImage.h
     * overloaded in derived classes in order to provide backward compatibility
 diff -uNBr Original-Code//Common/itkImage.txx Op-Code//Common/itkImage.txx
 --- Original-Code//Common/itkImage.txx	2009-08-14 08:40:36.000000000 -0300
-+++ Op-Code//Common/itkImage.txx	2012-01-16 05:08:13.082460724 -0200
++++ Op-Code//Common/itkImage.txx	2012-02-16 03:30:35.503819980 -0200
 @@ -175,6 +175,36 @@
  #endif
  }
@@ -345,8 +346,8 @@ diff -uNBr Original-Code//Common/itkImage.txx Op-Code//Common/itkImage.txx
   *
 diff -uNBr Original-Code//Common/itkStopWatch.cxx Op-Code//Common/itkStopWatch.cxx
 --- Original-Code//Common/itkStopWatch.cxx	1969-12-31 21:00:00.000000000 -0300
-+++ Op-Code//Common/itkStopWatch.cxx	2012-01-16 05:08:13.177456616 -0200
-@@ -0,0 +1,195 @@
++++ Op-Code//Common/itkStopWatch.cxx	2012-02-16 03:30:35.523819142 -0200
+@@ -0,0 +1,214 @@
 +// 
 +// StopWatch.cxx
 +//  
@@ -395,9 +396,9 @@ diff -uNBr Original-Code//Common/itkStopWatch.cxx Op-Code//Common/itkStopWatch.c
 +#ifdef _WIN32
 +
 +    QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
-+
++ 
 +#else
-+    _frequency = 1000;
++    _frequency = 1000000;
 +#endif
 +
 +}
@@ -429,9 +430,13 @@ diff -uNBr Original-Code//Common/itkStopWatch.cxx Op-Code//Common/itkStopWatch.c
 +    #ifdef _WIN32
 +        QueryPerformanceCounter((LARGE_INTEGER *)&n);
 +    #else
-+        struct timeval s;
-+        gettimeofday(&s, 0);
-+        n = (i64)s.tv_sec * 1000 + (i64)s.tv_usec / 1000;
++        struct timespec ts;
++        clock_gettime(CLOCK_MONOTONIC, &ts);
++        n = (i64)ts.tv_sec * 1000000LL + (i64)ts.tv_nsec / 1000LL;
++    
++//        struct timeval s;
++//        gettimeofday(&s, 0);
++//        n = (i64)s.tv_sec * 1000 + (i64)s.tv_usec / 1000;
 +    #endif
 +    return n;
 +}
@@ -456,11 +461,26 @@ diff -uNBr Original-Code//Common/itkStopWatch.cxx Op-Code//Common/itkStopWatch.c
 +void
 +StopWatch::AddCheckpoint(const string tag, const bool ignore)
 +{
++    if(ignore) {
++        AddCheckpoint(tag, ignore, -1);
++    }
++    else {
++        AddCheckpoint(tag, ignore, LastNotIgnoredCheckpointIndex());
++    }
++}
++
++unsigned int StopWatch::LastNotIgnoredCheckpointIndex() {
++    return  GetNotIgnoredCheckpoints().size();
++}
++
++void
++StopWatch::AddCheckpoint(const string tag, const bool ignore, const int position)
++{
 +    double instant = GetElapsedTime();
 +    double elapsed = 0;
 +    if(_checkpoints.size() > 0)
 +        elapsed = instant - _checkpoints[_checkpoints.size() - 1].Instant;
-+    _checkpoints.push_back(Checkpoint(tag, instant, elapsed, ignore));
++    _checkpoints.push_back(Checkpoint(tag, instant, elapsed, ignore, position));
 +}
 +
 +//returns only not ignored
@@ -544,8 +564,8 @@ diff -uNBr Original-Code//Common/itkStopWatch.cxx Op-Code//Common/itkStopWatch.c
 +}
 diff -uNBr Original-Code//Common/itkStopWatch.h Op-Code//Common/itkStopWatch.h
 --- Original-Code//Common/itkStopWatch.h	1969-12-31 21:00:00.000000000 -0300
-+++ Op-Code//Common/itkStopWatch.h	2012-01-16 05:08:13.182456401 -0200
-@@ -0,0 +1,172 @@
++++ Op-Code//Common/itkStopWatch.h	2012-02-16 03:30:35.523819142 -0200
+@@ -0,0 +1,185 @@
 +// 
 +// StopWatch.h
 +//  
@@ -605,10 +625,21 @@ diff -uNBr Original-Code//Common/itkStopWatch.h Op-Code//Common/itkStopWatch.h
 +    double Instant;
 +    double Elapsed;
 +    bool Ignore;
++    int Position;
++    
 +    Checkpoint(string tag, double instant, double elapsed, bool ignore) {
 +      this->Tag = tag;
 +      this->Instant = instant;
 +      this->Elapsed = elapsed;
++      this->Ignore = ignore;
++      this->Position = 0;
++    }
++    
++    Checkpoint(string tag, double instant, double elapsed, bool ignore, int position) {
++      this->Tag = tag;
++      this->Instant = instant;
++      this->Elapsed = elapsed;
++      this->Position = position;
 +      this->Ignore = ignore;
 +    }
 +};
@@ -652,6 +683,7 @@ diff -uNBr Original-Code//Common/itkStopWatch.h Op-Code//Common/itkStopWatch.h
 +     */
 +    void AddCheckpoint(const string tag);
 +    void AddCheckpoint(const string tag, const bool ignore);
++    void AddCheckpoint(const string tag, const bool ignore, const int position);
 +    
 +    double GetTotalCheckpointsTime();
 +    
@@ -670,6 +702,7 @@ diff -uNBr Original-Code//Common/itkStopWatch.h Op-Code//Common/itkStopWatch.h
 +    
 +    vector<Checkpoint>& GetCheckpoints();
 +    vector<Checkpoint> GetNotIgnoredCheckpoints();
++    unsigned int LastNotIgnoredCheckpointIndex();
 +    
 +    std::string ToString();
 +    
@@ -720,7 +753,7 @@ diff -uNBr Original-Code//Common/itkStopWatch.h Op-Code//Common/itkStopWatch.h
 +#endif // _STOPWATCH_H_
 diff -uNBr Original-Code//IO/itkImageFileReader.txx Op-Code//IO/itkImageFileReader.txx
 --- Original-Code//IO/itkImageFileReader.txx	2009-08-11 09:45:07.000000000 -0300
-+++ Op-Code//IO/itkImageFileReader.txx	2012-01-16 05:08:13.244453720 -0200
++++ Op-Code//IO/itkImageFileReader.txx	2012-02-16 03:30:35.527818974 -0200
 @@ -24,6 +24,8 @@
  #include "itkImageRegion.h"
  #include "itkPixelTraits.h"
@@ -842,7 +875,7 @@ diff -uNBr Original-Code//IO/itkImageFileReader.txx Op-Code//IO/itkImageFileRead
 +//    delete [] outputData;
 diff -uNBr Original-Code//IO/itkImageFileWriter.txx Op-Code//IO/itkImageFileWriter.txx
 --- Original-Code//IO/itkImageFileWriter.txx	2009-08-24 15:08:39.000000000 -0300
-+++ Op-Code//IO/itkImageFileWriter.txx	2012-01-16 05:08:13.259453070 -0200
++++ Op-Code//IO/itkImageFileWriter.txx	2012-02-16 03:30:35.527818974 -0200
 @@ -26,6 +26,8 @@
  #include "itkVectorImage.h"
  #include "itkImageRegionConstIterator.h"
@@ -890,3 +923,14 @@ diff -uNBr Original-Code//IO/itkImageFileWriter.txx Op-Code//IO/itkImageFileWrit
  }
  
  
+diff -uNBr Original-Code//IO/itkImageIORegion.h Op-Code//IO/itkImageIORegion.h
+--- Original-Code//IO/itkImageIORegion.h	2009-07-12 07:52:54.000000000 -0300
++++ Op-Code//IO/itkImageIORegion.h	2012-02-16 03:30:35.587816462 -0200
+@@ -23,6 +23,7 @@
+ #include "itkImageRegion.h"
+ #include "itkIndex.h"
+ #include "itkSize.h"
++#include <stddef.h>
+ 
+ namespace itk
+ {
