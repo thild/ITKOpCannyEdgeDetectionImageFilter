@@ -16,7 +16,7 @@ $ mkdir InsightTootlkit-3.x-build
 $ cd InsightTootlkit-3.x-build
 ccmake ../InsightToolkit-3.x
 
-add the fowlling flags:
+add the following flags:
 CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
 CMAKE_BUILD_TYPE:STRING=Release
 CMAKE_CXX_FLAGS:STRING=-fabi-version=5
@@ -30,21 +30,20 @@ Step 3: Download the latest ITKOpCannyEdgeDetectionFilter source code from https
 
 $ mkdir ITKOpCannyEdgeDetectionFilter-Build
 $ cd ITKOpCannyEdgeDetectionFilter-Build
-$ ccmake .
+$ ccmake ../ITKOpCannyEdgeDetectionFilter
 
-add the fowlling flags:
+add the following flags:
 CMAKE_CXX_COMPILER:FILEPATH=/usr/bin/c++
 CMAKE_BUILD_TYPE:STRING=Release
 CMAKE_CXX_FLAGS:STRING=-fopenmp -msse -msse2 -msse3 -msse4 -msse4.1 -msse4.2 -fabi-version=5
 CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG -mfpmath=sse -march=native -mtune=native -ffast-math -ftree-vectorize
-CMAKE_INSTALL_PREFIX:PATH=../ITKOpCannyEdgeDetectionImageFilter-Bin
+CMAKE_INSTALL_PREFIX:PATH=/path/to/ITKOpCannyEdgeDetectionImageFilter-Bin
 ITK_DIR:PATH=/path/to/patched/install/of/InsightToolkit-3.x
 
 $ make install
-$ cd ../ITKOpCannyEdgeDetectionFilter-Bin/bin
+$ cd /path/to/ITKOpCannyEdgeDetectionImageFilter-Bin
 $ wget http://dl.dropbox.com/u/6882617/dataset.tar.gz
 $ tar zxf dataset.tar.gz
 $ cd dataset/bin
 $ ./generate_datasets 6
 $ ./opcanny -pt -c test.cfg
-
