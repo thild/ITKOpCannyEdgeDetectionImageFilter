@@ -216,14 +216,14 @@ OpCannyEdgeDetectionImageFilter< TInputImage, TOutputImage >
   sw->AddCheckpoint("Multiply");  
                  
   sw->AddCheckpoint("Begin HysteresisThresholding", true);
-  StopWatch b;
-  b.Start();
+//  StopWatch b;
+//  b.Start();
 //  CALLGRIND_TOGGLE_COLLECT;
   this->HysteresisThresholding();                    
 //  CALLGRIND_TOGGLE_COLLECT;
 //  CALLGRIND_STOP_INSTRUMENTATION;  
   
-  b.Stop();
+//  b.Stop();
   sw->AddCheckpoint("HysteresisThresholding");
              
   sw->Stop();

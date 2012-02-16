@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 10.00
 # Visual Studio 2008
-Project("{2857B73E-F847-4B02-9238-064979017E93}") = "ITKOpCannyEdgeDetectionImageFilter", "src\ITKOpCannyEdgeDetectionImageFilter\ITKOpCannyEdgeDetectionImageFilter.cproj", "{D12F4D8E-0DAC-4733-BA79-6DD19FA1B53C}"
+Project("{2857B73E-F847-4B02-9238-064979017E93}") = "ITKOpCannyEdgeDetectionImageFilter", "src\ITKOpCannyEdgeDetectionImageFilter.cproj", "{D12F4D8E-0DAC-4733-BA79-6DD19FA1B53C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,7 +15,7 @@ Global
 		{D12F4D8E-0DAC-4733-BA79-6DD19FA1B53C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(MonoDevelopProperties) = preSolution
-		StartupItem = src\ITKOpCannyEdgeDetectionImageFilter\ITKOpCannyEdgeDetectionImageFilter.cproj
+		StartupItem = src\ITKOpCannyEdgeDetectionImageFilter.cproj
 		Policies = $0
 		$0.TextStylePolicy = $1
 		$1.inheritsSet = null
@@ -26,7 +26,7 @@ Global
 		$2.scope = text/plain
 		$0.StandardHeader = $3
 		$3.Text = 
-		$3.inheritsSet = Apache2License
+		$3.IncludeInNewFiles = True
 		$0.TextStylePolicy = $4
 		$4.inheritsSet = null
 		$4.scope = text/x-csrc
